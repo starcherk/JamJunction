@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JamJunction — Music Collaboration</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ── Header ──────────────────────────────────────────────── -->
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2"/>
+            <circle cx="20" cy="20" r="6"  fill="currentColor"/>
+            <path d="M20 2 A18 18 0 0 1 38 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 2 A18 18 0 0 0 2 20"  stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".4"/>
+          </svg>
+          <span class="logo-text">JamJunction</span>
+        </div>
+        <p class="tagline">Music collaboration, together.</p>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <!-- ── Upload section ──────────────────────────────────────── -->
+      <section class="section" id="upload-section">
+        <h2 class="section-title">Share a Track</h2>
+
+        <div
+          id="drop-zone"
+          class="drop-zone"
+          role="button"
+          tabindex="0"
+          aria-label="Drop audio file or click to browse"
+        >
+          <div class="drop-zone-inner" id="drop-zone-idle">
+            <svg class="drop-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+              <path d="M24 32V16M24 16L17 23M24 16L31 23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 36a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+            </svg>
+            <p class="drop-text-primary">Drop your track here</p>
+            <p class="drop-text-secondary">or <span class="link-style">click to browse</span></p>
+            <p class="drop-formats">MP3 · WAV · FLAC · OGG · AAC · M4A &nbsp;·&nbsp; max 500 MB</p>
+          </div>
+          <input
+            type="file"
+            id="file-input"
+            accept="audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a"
+            class="visually-hidden"
+            aria-hidden="true"
+          />
+        </div>
+
+        <!-- Progress bar (hidden until upload starts) -->
+        <div id="upload-progress" class="upload-progress hidden" aria-live="polite">
+          <div class="progress-header">
+            <span id="progress-filename" class="progress-filename"></span>
+            <span id="progress-pct" class="progress-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <p id="upload-status" class="upload-status"></p>
+        </div>
+
+        <!-- Auth prompt (shown when upload returns 401) -->
+        <div id="auth-prompt" class="auth-prompt hidden" role="alert">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z" clip-rule="evenodd"/>
+          </svg>
+          <span>Sign in via Cloudflare Access to upload tracks.</span>
+        </div>
+      </section>
+
+      <!-- ── Library section ────────────────────────────────────── -->
+      <section class="section" id="library-section">
+        <div class="library-header">
+          <h2 class="section-title">Library</h2>
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd"/>
+            </svg>
+            <input
+              type="search"
+              id="search-input"
+              class="search-input"
+              placeholder="Search tracks…"
+              aria-label="Search tracks"
+            />
+          </div>
+        </div>
+
+        <!-- Loading skeleton -->
+        <div id="library-loading" class="loading-state" aria-live="polite" aria-label="Loading tracks">
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+          <div class="skeleton-row"></div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="library-empty" class="empty-state hidden">
+          <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="2"/>
+            <path d="M18 24h12M24 18v12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity=".4"/>
+          </svg>
+          <p>No tracks yet. Be the first to share one!</p>
+        </div>
+
+        <!-- File list -->
+        <ul id="file-list" class="file-list hidden" aria-label="Shared tracks"></ul>
+      </section>
+    </main>
+
+    <!-- ── Sticky audio player ────────────────────────────────────── -->
+    <div id="player-bar" class="player-bar hidden" aria-label="Audio player">
+      <div class="player-inner">
+        <div class="player-info">
+          <svg class="player-note" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M18 3a1 1 0 0 0-1.196-.98l-10 2A1 1 0 0 0 6 5v9.114A4.369 4.369 0 0 0 5 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0 0 15 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3Z"/>
+          </svg>
+          <span id="player-track-name" class="player-track-name"></span>
+        </div>
+        <audio id="audio-player" controls preload="none" class="player-audio"></audio>
+        <button id="player-close" class="player-close" aria-label="Close player">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Notification toast ─────────────────────────────────────── -->
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
