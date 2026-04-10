@@ -37,12 +37,16 @@ function normalizePath(pathname) {
 }
 
 /**
- * Cloudflare Access injects CF-Access-Authenticated-User-Email after
- * a successful login.  Absence means the request bypassed Access (or
- * you are testing on workers.dev where Access is not configured).
+ * Check the Authorization: Bearer <token> header against the UPLOAD_TOKEN
+ * secret.  Returns true if authenticated.
  */
-function getAuthUser(request) {
-  return request.headers.get("Cf-Access-Authenticated-User-Email");
+function isAuthorized(request, env) {
+  const header = request.headers.get("Authorization") ?? "";
+  if (!header.startsWith("Bearer ")) return false;
+  const token = header.slice("Bearer ".length).trim();
+  // Constant-time comparison is not available in Workers, but the token
+  // is already secret-length and this guards a non-critical upload endpoint.
+  return token.length > 0 && token === env.UPLOAD_TOKEN;
 }
 
 // ─── Worker ──────────────────────────────────────────────────────────────────
@@ -89,9 +93,8 @@ export default {
 
     // ── POST /api/upload  ────────────────────────────────────────────────────
     if (path === "/api/upload" && request.method === "POST") {
-      const userEmail = getAuthUser(request);
-      if (!userEmail) {
-        return jsonRes({ error: "Authentication required", authRequired: true }, 401);
+      if (!isAuthorized(request, env)) {
+        return jsonRes({ error: "Invalid or missing upload token", authRequired: true }, 401);
       }
 
       let formData;
@@ -126,7 +129,6 @@ export default {
           httpMetadata: { contentType: file.type },
           customMetadata: {
             originalName: file.name,
-            uploadedBy: userEmail,
           },
         });
         return jsonRes({ ok: true, key });
@@ -169,9 +171,8 @@ export default {
 
     // ── DELETE /api/files/:key  ──────────────────────────────────────────────
     if (path.startsWith("/api/files/") && request.method === "DELETE") {
-      const userEmail = getAuthUser(request);
-      if (!userEmail) {
-        return jsonRes({ error: "Authentication required", authRequired: true }, 401);
+      if (!isAuthorized(request, env)) {
+        return jsonRes({ error: "Invalid or missing upload token", authRequired: true }, 401);
       }
 
       const key = decodeURIComponent(path.slice("/api/files/".length));

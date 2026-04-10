@@ -18,6 +18,10 @@ const progressName   = document.getElementById("progress-filename");
 const uploadStatus   = document.getElementById("upload-status");
 const authPrompt     = document.getElementById("auth-prompt");
 
+const tokenInput     = document.getElementById("upload-token");
+const tokenToggle    = document.getElementById("token-toggle");
+const tokenHint      = document.getElementById("token-hint");
+
 const libraryLoading = document.getElementById("library-loading");
 const libraryEmpty   = document.getElementById("library-empty");
 const fileList       = document.getElementById("file-list");
@@ -35,6 +39,51 @@ const toast          = document.getElementById("toast");
 let allFiles       = [];   // full file list from API
 let currentKey     = null; // key of the track being played
 let toastTimer     = null;
+
+// ─── Token management ────────────────────────────────────────────────────────
+
+const TOKEN_KEY = "jj_upload_token";
+
+function getToken() {
+  return tokenInput.value.trim() || localStorage.getItem(TOKEN_KEY) || "";
+}
+
+function saveToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+// Restore saved token on load
+(function initToken() {
+  const saved = localStorage.getItem(TOKEN_KEY);
+  if (saved) {
+    tokenInput.value = saved;
+    tokenHint.textContent = "Token loaded from saved session.";
+    tokenHint.className = "token-hint valid";
+  }
+})();
+
+tokenInput.addEventListener("input", () => {
+  const val = tokenInput.value.trim();
+  if (val) {
+    saveToken(val);
+    tokenHint.textContent = "Token saved.";
+    tokenHint.className = "token-hint valid";
+    tokenInput.classList.remove("invalid");
+    tokenInput.classList.add("valid");
+    authPrompt.classList.add("hidden");
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    tokenHint.textContent = "";
+    tokenHint.className = "token-hint";
+    tokenInput.classList.remove("valid", "invalid");
+  }
+});
+
+tokenToggle.addEventListener("click", () => {
+  const isPassword = tokenInput.type === "password";
+  tokenInput.type = isPassword ? "text" : "password";
+  tokenToggle.setAttribute("aria-label", isPassword ? "Hide token" : "Show token");
+});
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -229,13 +278,26 @@ searchInput.addEventListener("input", () => {
 async function deleteFile(file) {
   if (!confirm(`Delete "${file.originalName}"? This cannot be undone.`)) return;
 
+  const token = getToken();
+  if (!token) {
+    tokenInput.focus();
+    tokenInput.classList.add("invalid");
+    tokenHint.textContent = "Enter your upload token first.";
+    tokenHint.className = "token-hint invalid";
+    return;
+  }
+
   try {
     const res = await fetch(
       `${BASE}/api/files/${encodeURIComponent(file.key)}`,
-      { method: "DELETE" }
+      { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } }
     );
     if (res.status === 401) {
-      showToast("Authentication required to delete files.", "error");
+      tokenInput.classList.add("invalid");
+      tokenInput.classList.remove("valid");
+      tokenHint.textContent = "Token rejected by server.";
+      tokenHint.className = "token-hint invalid";
+      showToast("Incorrect token — delete rejected.", "error");
       return;
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -274,6 +336,15 @@ function setUploadStatus(message, type = "") {
 }
 
 async function uploadFile(file) {
+  const token = getToken();
+  if (!token) {
+    tokenInput.focus();
+    tokenInput.classList.add("invalid");
+    tokenHint.textContent = "Enter your upload token first.";
+    tokenHint.className = "token-hint invalid";
+    return;
+  }
+
   setProgressVisible(true);
   setProgress(0, file.name);
   setUploadStatus("Uploading…");
@@ -284,6 +355,7 @@ async function uploadFile(file) {
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${BASE}/api/upload`);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
@@ -296,6 +368,10 @@ async function uploadFile(file) {
 
       if (xhr.status === 401) {
         setProgressVisible(false);
+        tokenInput.classList.add("invalid");
+        tokenInput.classList.remove("valid");
+        tokenHint.textContent = "Token rejected by server.";
+        tokenHint.className = "token-hint invalid";
         authPrompt.classList.remove("hidden");
         resolve(false);
         return;
