@@ -44,13 +44,6 @@ function normalizePath(pathname) {
   return pathname;
 }
 
-function isAuthorized(request, env) {
-  const header = request.headers.get("Authorization") ?? "";
-  if (!header.startsWith("Bearer ")) return false;
-  const token = header.slice("Bearer ".length).trim();
-  return token.length > 0 && token === env.UPLOAD_TOKEN;
-}
-
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
 async function hashPassword(password, salt) {
@@ -513,7 +506,7 @@ export default {
       }));
 
       // Build approval link with HMAC signature
-      const sig = await hmacSign(email, env.UPLOAD_TOKEN);
+      const sig = await hmacSign(email, env.HMAC_SECRET);
       const approveUrl = `${baseUrl}/api/admin/approve?email=${encodeURIComponent(email)}&sig=${sig}`;
 
       try {
@@ -537,7 +530,7 @@ export default {
         return htmlRes(approvalResultHTML(false, "Missing parameters."), 400);
       }
 
-      const valid = await hmacVerify(email, sig, env.UPLOAD_TOKEN);
+      const valid = await hmacVerify(email, sig, env.HMAC_SECRET);
       if (!valid) {
         return htmlRes(approvalResultHTML(false, "Invalid or expired approval link."), 403);
       }
@@ -682,10 +675,6 @@ export default {
 
     // ── POST /api/upload  ────────────────────────────────────────────────────
     if (path === "/api/upload" && request.method === "POST") {
-      if (!isAuthorized(request, env)) {
-        return jsonRes({ error: "Invalid or missing upload token", authRequired: true }, 401);
-      }
-
       let formData;
       try {
         formData = await request.formData();
@@ -758,10 +747,6 @@ export default {
 
     // ── DELETE /api/files/:key  ──────────────────────────────────────────────
     if (path.startsWith("/api/files/") && request.method === "DELETE") {
-      if (!isAuthorized(request, env)) {
-        return jsonRes({ error: "Invalid or missing upload token", authRequired: true }, 401);
-      }
-
       const key = decodeURIComponent(path.slice("/api/files/".length));
       if (!key) return jsonRes({ error: "No key provided" }, 400);
 

@@ -43,6 +43,18 @@
 					"binding": "JAMJUNCTION_AUTH",
 					"id": "2c1058b3e1cc47218fd43abb14ead693"
 				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "JAMJUNCTION_BUCKET",
+					"bucket_name": "jamjunction-files",
+					"preview_bucket_name": "jamjunction-files-preview"
+				}
+			],
+			"send_email": [
+				{
+					"name": "SEND_EMAIL"
+				}
 			]
 		},
 
