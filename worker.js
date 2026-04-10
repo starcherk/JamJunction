@@ -239,8 +239,9 @@ function portalHTML() {
 
       <!-- Step 3: Set password (approved, no password yet) -->
       <div id="step-setpw" class="hidden">
-        <p>You've been approved! Set a password to continue.</p>
+        <p>You've been approved! Set your name and a password to continue.</p>
         <form id="setpw-form">
+          <input class="input-field" type="text" id="display-name" placeholder="Your name" required minlength="1" autocomplete="name">
           <input class="input-field" type="password" id="new-password" placeholder="Choose a password" required minlength="6" autocomplete="new-password">
           <input class="input-field" type="password" id="confirm-password" placeholder="Confirm password" required minlength="6" autocomplete="new-password">
           <button class="btn" type="submit" id="setpw-btn">Set Password &amp; Enter</button>
@@ -355,9 +356,11 @@ function portalHTML() {
     document.getElementById("setpw-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const btn = document.getElementById("setpw-btn");
+      const displayName = document.getElementById("display-name").value.trim();
       const pw = document.getElementById("new-password").value;
       const confirmPw = document.getElementById("confirm-password").value;
       if (pw !== confirmPw) { showStatus("Passwords don't match", "error"); return; }
+      if (!displayName) { showStatus("Name is required", "error"); return; }
       btn.disabled = true;
       btn.textContent = "Setting up\u2026";
       showStatus("", "");
@@ -365,7 +368,7 @@ function portalHTML() {
         const res = await fetch(BASE + "/api/auth/set-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail, password: pw }),
+          body: JSON.stringify({ email: userEmail, password: pw, name: displayName }),
         });
         if (res.ok) {
           showStatus("Welcome! Loading\u2026", "success");
@@ -557,6 +560,7 @@ export default {
       if (body.password.length < 6) return jsonRes({ error: "Password must be at least 6 characters" }, 400);
 
       const email = body.email.toLowerCase().trim();
+      const displayName = typeof body.name === "string" ? body.name.trim() : "";
       const user = await env.JAMJUNCTION_AUTH.get(`user:${email}`, "json");
       if (!user || user.status !== "approved") {
         return jsonRes({ error: "Not authorized to set a password" }, 403);
@@ -569,12 +573,14 @@ export default {
       user.salt = salt;
       user.passwordHash = hash;
       user.activatedAt = Date.now();
+      if (displayName) user.name = displayName;
       await env.JAMJUNCTION_AUTH.put(`user:${email}`, JSON.stringify(user));
 
       // Create session
       const token = crypto.randomUUID();
       await env.JAMJUNCTION_AUTH.put(`session:${token}`, JSON.stringify({
         email,
+        name: user.name || "",
         created: Date.now(),
         expires: Date.now() + SESSION_MAX_AGE * 1000,
       }), { expirationTtl: SESSION_MAX_AGE });
@@ -615,6 +621,7 @@ export default {
       const token = crypto.randomUUID();
       await env.JAMJUNCTION_AUTH.put(`session:${token}`, JSON.stringify({
         email,
+        name: user.name || "",
         created: Date.now(),
         expires: Date.now() + SESSION_MAX_AGE * 1000,
       }), { expirationTtl: SESSION_MAX_AGE });
@@ -642,6 +649,11 @@ export default {
         return jsonRes({ error: "Authentication required" }, 401);
       }
       return htmlRes(portalHTML());
+    }
+
+    // ── GET /api/auth/me ─────────────────────────────────────────────────────
+    if (path === "/api/auth/me" && request.method === "GET") {
+      return jsonRes({ email: session.email, name: session.name || "" });
     }
 
     // ── GET /api/files  ──────────────────────────────────────────────────────
@@ -758,6 +770,7 @@ export default {
           httpMetadata: { contentType: file.type },
           customMetadata: {
             originalName: file.name,
+            uploadedBy: session.name || session.email,
           },
         });
         return jsonRes({ ok: true, key });
