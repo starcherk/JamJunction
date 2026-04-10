@@ -1,24 +1,24 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "jamjunction",
-  "main": "worker.js",
-  "compatibility_date": "2026-04-09",
-  "workers_dev": true,
-  "assets": {
-    "directory": "./public",
-    "not_found_handling": "single-page-application"
-  },
-  "r2_buckets": [
-    {
-      "binding": "JAMJUNCTION_BUCKET",
-      "bucket_name": "jamjunction-files",
-      "preview_bucket_name": "jamjunction-files-preview"
-    }
-  ],
-  "routes": [
-    {
-      "pattern": "kylestarcher.com/JamJunction*",
-      "zone_id": "87732050809c9ad8c87df515a4635b49"
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "jamjunction",
+	"main": "worker.js",
+	"compatibility_date": "2026-04-09",
+	"workers_dev": true,
+	"assets": {
+		"directory": "./public",
+		"not_found_handling": "single-page-application"
+	},
+	"r2_buckets": [
+		{
+			"binding": "JAMJUNCTION_BUCKET",
+			"bucket_name": "jamjunction-files",
+			"preview_bucket_name": "jamjunction-files-preview"
+		}
+	],
+	"routes": [
+		{
+			"pattern": "kylestarcher.com/JamJunction*",
+			"zone_id": "87732050809c9ad8c87df515a4635b49"
+		}
+	]
 }
