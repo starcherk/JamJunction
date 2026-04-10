@@ -29,10 +29,11 @@ const libraryEmpty   = document.getElementById("library-empty");
 const fileList       = document.getElementById("file-list");
 const searchInput    = document.getElementById("search-input");
 
-const playerBar      = document.getElementById("player-bar");
-const audioPlayer    = document.getElementById("audio-player");
-const playerName     = document.getElementById("player-track-name");
-const playerClose    = document.getElementById("player-close");
+const playerBar       = document.getElementById("player-bar");
+const audioPlayer     = document.getElementById("audio-player");
+const playerName      = document.getElementById("player-track-name");
+const playerClose     = document.getElementById("player-close");
+const playerEqualizer = document.getElementById("player-equalizer");
 
 const toast          = document.getElementById("toast");
 
@@ -194,6 +195,7 @@ function togglePlay(file) {
   audioPlayer.src = `${BASE}/api/download/${encodeURIComponent(file.key)}`;
   audioPlayer.play().catch(() => {});
   playerBar.classList.remove("hidden");
+  playerEqualizer.classList.remove("paused");
   updatePlayingState();
 }
 
@@ -204,8 +206,8 @@ function updatePlayingState() {
     const btn = item.querySelector(".file-play-btn");
     if (!btn) return;
     const playSvg = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.84Z"/></svg>`;
-    const stopSvg = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4Z" clip-rule="evenodd"/></svg>`;
-    btn.innerHTML  = isPlaying ? stopSvg : playSvg;
+    const eqBars = `<div class="equalizer-sm"><span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span></div>`;
+    btn.innerHTML  = isPlaying ? eqBars : playSvg;
     btn.ariaLabel  = `${isPlaying ? "Stop" : "Play"} ${item.querySelector(".file-name")?.textContent ?? ""}`;
   });
 }
@@ -214,6 +216,14 @@ audioPlayer.addEventListener("ended", () => {
   currentKey = null;
   updatePlayingState();
   playerBar.classList.add("hidden");
+});
+
+audioPlayer.addEventListener("pause", () => {
+  playerEqualizer.classList.add("paused");
+});
+
+audioPlayer.addEventListener("play", () => {
+  playerEqualizer.classList.remove("paused");
 });
 
 playerClose.addEventListener("click", () => {
