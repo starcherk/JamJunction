@@ -105,6 +105,21 @@
         <!-- File list -->
         <ul id="file-list" class="file-list hidden" aria-label="Shared tracks"></ul>
       </section>
+
+      <!-- ── Visualizer section ──────────────────────────────────── -->
+      <section class="section visualizer-section" id="visualizer-section">
+        <div class="visualizer-header">
+          <h2 class="section-title">Equalizer</h2>
+          <button class="viz-toggle" id="viz-toggle" aria-label="Collapse equalizer" aria-expanded="true">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+        </div>
+        <div class="visualizer-body" id="visualizer-body">
+          <canvas id="visualizer-canvas" class="visualizer-canvas" aria-hidden="true"></canvas>
+        </div>
+      </section>
     </main>
 
     <!-- ── Sticky audio player ────────────────────────────────────── -->
@@ -120,7 +135,7 @@
           </div>
           <span id="player-track-name" class="player-track-name"></span>
         </div>
-        <audio id="audio-player" controls preload="none" class="player-audio"></audio>
+        <audio id="audio-player" controls preload="none" class="player-audio" crossorigin="anonymous"></audio>
         <button id="player-close" class="player-close" aria-label="Close player">
           <svg viewBox="0 0 20 20" fill="currentColor">
             <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/>

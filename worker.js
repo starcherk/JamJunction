@@ -737,6 +737,7 @@ export default {
         headers.set("ETag", object.httpEtag);
         headers.set("Accept-Ranges", "bytes");
         headers.set("Cache-Control", "private, max-age=3600");
+        headers.set("Access-Control-Allow-Origin", new URL(request.url).origin);
 
         if (object.range) {
           const r = object.range;

@@ -35,6 +35,12 @@ const playerName      = document.getElementById("player-track-name");
 const playerClose     = document.getElementById("player-close");
 const playerEqualizer = document.getElementById("player-equalizer");
 
+const visualizerSection = document.getElementById("visualizer-section");
+const visualizerBody    = document.getElementById("visualizer-body");
+const visualizerCanvas  = document.getElementById("visualizer-canvas");
+const vizCtx            = visualizerCanvas.getContext("2d");
+const vizToggle         = document.getElementById("viz-toggle");
+
 const toast          = document.getElementById("toast");
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -42,6 +48,92 @@ const toast          = document.getElementById("toast");
 let allFiles       = [];   // full file list from API
 let currentKey     = null; // key of the track being played
 let toastTimer     = null;
+
+// ─── Audio visualizer ─────────────────────────────────────────────────────────
+
+let audioCtx  = null;
+let analyser  = null;
+let sourceNode = null;
+let vizAnimId = null;
+
+function ensureAudioContext() {
+  if (audioCtx) return;
+  audioCtx   = new (window.AudioContext || window.webkitAudioContext)();
+  analyser   = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.8;
+  sourceNode = audioCtx.createMediaElementSource(audioPlayer);
+  sourceNode.connect(analyser);
+  analyser.connect(audioCtx.destination);
+}
+
+function resizeCanvas() {
+  const rect = visualizerCanvas.getBoundingClientRect();
+  visualizerCanvas.width  = rect.width * window.devicePixelRatio;
+  visualizerCanvas.height = rect.height * window.devicePixelRatio;
+  vizCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+function drawVisualizer() {
+  const w = visualizerCanvas.getBoundingClientRect().width;
+  const h = visualizerCanvas.getBoundingClientRect().height;
+
+  const bufferLength = analyser.frequencyBinCount;
+  const data = new Uint8Array(bufferLength);
+  analyser.getByteFrequencyData(data);
+
+  vizCtx.clearRect(0, 0, w, h);
+
+  const barCount = Math.min(bufferLength, 64);
+  const gap = 2;
+  const barWidth = (w - gap * (barCount - 1)) / barCount;
+
+  for (let i = 0; i < barCount; i++) {
+    const val = data[i] / 255;
+    const barH = Math.max(2, val * h);
+    const x = i * (barWidth + gap);
+    const y = h - barH;
+
+    // Gradient from accent to accent-light
+    const grad = vizCtx.createLinearGradient(x, y, x, h);
+    grad.addColorStop(0, "#a78bfa");
+    grad.addColorStop(1, "#7c3aed");
+    vizCtx.fillStyle = grad;
+
+    vizCtx.beginPath();
+    vizCtx.roundRect(x, y, barWidth, barH, 2);
+    vizCtx.fill();
+  }
+
+  vizAnimId = requestAnimationFrame(drawVisualizer);
+}
+
+function startVisualizer() {
+  ensureAudioContext();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  resizeCanvas();
+  if (!vizAnimId) drawVisualizer();
+}
+
+function stopVisualizer() {
+  if (vizAnimId) { cancelAnimationFrame(vizAnimId); vizAnimId = null; }
+  // Clear the canvas to flat bars when stopped
+  const w = visualizerCanvas.getBoundingClientRect().width;
+  const h = visualizerCanvas.getBoundingClientRect().height;
+  vizCtx.clearRect(0, 0, w, h);
+}
+
+window.addEventListener("resize", () => {
+  if (!visualizerBody.classList.contains("collapsed")) resizeCanvas();
+});
+
+vizToggle.addEventListener("click", () => {
+  const collapsed = visualizerBody.classList.toggle("collapsed");
+  vizToggle.classList.toggle("collapsed", collapsed);
+  vizToggle.setAttribute("aria-expanded", String(!collapsed));
+  vizToggle.setAttribute("aria-label", collapsed ? "Expand equalizer" : "Collapse equalizer");
+  if (!collapsed && currentKey) resizeCanvas();
+});
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -187,6 +279,7 @@ function togglePlay(file) {
     currentKey = null;
     updatePlayingState();
     playerBar.classList.add("hidden");
+    stopVisualizer();
     return;
   }
 
@@ -196,6 +289,7 @@ function togglePlay(file) {
   audioPlayer.play().catch(() => {});
   playerBar.classList.remove("hidden");
   playerEqualizer.classList.remove("paused");
+  startVisualizer();
   updatePlayingState();
 }
 
@@ -216,6 +310,7 @@ audioPlayer.addEventListener("ended", () => {
   currentKey = null;
   updatePlayingState();
   playerBar.classList.add("hidden");
+  stopVisualizer();
 });
 
 audioPlayer.addEventListener("pause", () => {
@@ -231,6 +326,7 @@ playerClose.addEventListener("click", () => {
   currentKey = null;
   updatePlayingState();
   playerBar.classList.add("hidden");
+  stopVisualizer();
 });
 
 // ─── Search / filter ──────────────────────────────────────────────────────────
