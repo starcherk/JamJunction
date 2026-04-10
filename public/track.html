@@ -60,24 +60,11 @@
 
         <div class="track-meta-row" id="track-meta"></div>
 
-        <!-- Player + Equalizer -->
-        <div class="track-player-section">
-          <audio id="audio-player" controls preload="none" class="track-audio" crossorigin="anonymous"></audio>
+        <!-- Player card with integrated visualizer -->
+        <div class="player-card" id="player-card">
+          <canvas id="visualizer-canvas" class="player-card-canvas" aria-hidden="true"></canvas>
+          <audio id="audio-player" controls preload="none" class="player-card-audio" crossorigin="anonymous"></audio>
         </div>
-
-        <section class="track-visualizer-section">
-          <div class="visualizer-header">
-            <h2 class="section-title">Equalizer</h2>
-            <button class="viz-toggle" id="viz-toggle" aria-label="Collapse equalizer" aria-expanded="true">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
-              </svg>
-            </button>
-          </div>
-          <div class="visualizer-body" id="visualizer-body">
-            <canvas id="visualizer-canvas" class="visualizer-canvas" aria-hidden="true"></canvas>
-          </div>
-        </section>
 
         <!-- Actions -->
         <div class="track-actions">

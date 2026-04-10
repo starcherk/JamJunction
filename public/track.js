@@ -30,10 +30,8 @@ const deleteBtn     = document.getElementById("delete-btn");
 const backLink      = document.getElementById("back-link");
 const toast         = document.getElementById("toast");
 
-const visualizerBody   = document.getElementById("visualizer-body");
 const visualizerCanvas = document.getElementById("visualizer-canvas");
 const vizCtx           = visualizerCanvas.getContext("2d");
-const vizToggle        = document.getElementById("viz-toggle");
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +45,7 @@ let audioCtx   = null;
 let analyser   = null;
 let sourceNode = null;
 let vizAnimId  = null;
+let isPlaying  = false;
 
 function ensureAudioContext() {
   if (audioCtx) return;
@@ -61,39 +60,60 @@ function ensureAudioContext() {
 
 function resizeCanvas() {
   const rect = visualizerCanvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
   visualizerCanvas.width  = rect.width * window.devicePixelRatio;
   visualizerCanvas.height = rect.height * window.devicePixelRatio;
+  vizCtx.setTransform(1, 0, 0, 1, 0, 0);
   vizCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
 }
 
-function drawVisualizer() {
+function drawVisualizer(timestamp) {
   const w = visualizerCanvas.getBoundingClientRect().width;
   const h = visualizerCanvas.getBoundingClientRect().height;
 
-  const bufferLength = analyser.frequencyBinCount;
-  const data = new Uint8Array(bufferLength);
-  analyser.getByteFrequencyData(data);
-
   vizCtx.clearRect(0, 0, w, h);
 
-  const barCount = Math.min(bufferLength, 64);
-  const gap = 2;
+  const barCount = 64;
+  const gap = 3;
   const barWidth = (w - gap * (barCount - 1)) / barCount;
 
-  for (let i = 0; i < barCount; i++) {
-    const val = data[i] / 255;
-    const barH = Math.max(2, val * h);
-    const x = i * (barWidth + gap);
-    const y = h - barH;
+  if (isPlaying && analyser) {
+    // ─ Live frequency bars ─
+    const bufferLength = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteFrequencyData(data);
 
-    const grad = vizCtx.createLinearGradient(x, y, x, h);
-    grad.addColorStop(0, "#a78bfa");
-    grad.addColorStop(1, "#7c3aed");
-    vizCtx.fillStyle = grad;
+    for (let i = 0; i < barCount; i++) {
+      const val = data[i] / 255;
+      const barH = Math.max(2, val * h);
+      const x = i * (barWidth + gap);
+      const y = h - barH;
 
-    vizCtx.beginPath();
-    vizCtx.roundRect(x, y, barWidth, barH, 2);
-    vizCtx.fill();
+      const grad = vizCtx.createLinearGradient(x, y, x, h);
+      grad.addColorStop(0, "#a78bfa");
+      grad.addColorStop(1, "#7c3aed");
+      vizCtx.fillStyle = grad;
+
+      vizCtx.beginPath();
+      vizCtx.roundRect(x, y, barWidth, barH, 2);
+      vizCtx.fill();
+    }
+  } else {
+    // ─ Idle: subtle breathing sine wave bars ─
+    const t = (timestamp || 0) / 1000;
+    for (let i = 0; i < barCount; i++) {
+      const phase = (i / barCount) * Math.PI * 4 + t * 1.2;
+      const val = 0.05 + 0.04 * Math.sin(phase) + 0.02 * Math.sin(phase * 0.7 + t);
+      const barH = Math.max(2, val * h);
+      const x = i * (barWidth + gap);
+      const y = h - barH;
+
+      vizCtx.fillStyle = "#7c3aed33";
+
+      vizCtx.beginPath();
+      vizCtx.roundRect(x, y, barWidth, barH, 2);
+      vizCtx.fill();
+    }
   }
 
   vizAnimId = requestAnimationFrame(drawVisualizer);
@@ -102,28 +122,22 @@ function drawVisualizer() {
 function startVisualizer() {
   ensureAudioContext();
   if (audioCtx.state === "suspended") audioCtx.resume();
+  isPlaying = true;
   resizeCanvas();
   if (!vizAnimId) drawVisualizer();
 }
 
 function stopVisualizer() {
-  if (vizAnimId) { cancelAnimationFrame(vizAnimId); vizAnimId = null; }
-  const w = visualizerCanvas.getBoundingClientRect().width;
-  const h = visualizerCanvas.getBoundingClientRect().height;
-  vizCtx.clearRect(0, 0, w, h);
+  isPlaying = false;
+  // keep animation running for idle state
 }
 
-window.addEventListener("resize", () => {
-  if (!visualizerBody.classList.contains("collapsed")) resizeCanvas();
-});
+function startIdleLoop() {
+  resizeCanvas();
+  if (!vizAnimId) drawVisualizer();
+}
 
-vizToggle.addEventListener("click", () => {
-  const collapsed = visualizerBody.classList.toggle("collapsed");
-  vizToggle.classList.toggle("collapsed", collapsed);
-  vizToggle.setAttribute("aria-expanded", String(!collapsed));
-  vizToggle.setAttribute("aria-label", collapsed ? "Expand equalizer" : "Collapse equalizer");
-  if (!collapsed) resizeCanvas();
-});
+window.addEventListener("resize", resizeCanvas);
 
 audioPlayer.addEventListener("play", () => startVisualizer());
 audioPlayer.addEventListener("pause", () => stopVisualizer());
@@ -194,7 +208,7 @@ async function loadTrack() {
 
     trackLoading.classList.add("hidden");
     trackDetail.classList.remove("hidden");
-    resizeCanvas();
+    startIdleLoop();
   } catch (err) {
     trackLoading.innerHTML = `<p style="color:var(--error)">Track not found.</p>`;
   }
