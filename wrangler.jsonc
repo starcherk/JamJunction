@@ -6,7 +6,9 @@
 	"workers_dev": true,
 	"assets": {
 		"directory": "./public",
-		"not_found_handling": "single-page-application"
+		"not_found_handling": "single-page-application",
+		"run_worker_first": true,
+		"binding": "ASSETS"
 	},
 	"r2_buckets": [
 		{
@@ -19,6 +21,17 @@
 		{
 			"pattern": "kylestarcher.com/JamJunction*",
 			"zone_id": "87732050809c9ad8c87df515a4635b49"
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "JAMJUNCTION_AUTH",
+			"id": "2c1058b3e1cc47218fd43abb14ead693"
+		}
+	],
+	"send_email": [
+		{
+			"name": "SEND_EMAIL"
 		}
 	]
 }
