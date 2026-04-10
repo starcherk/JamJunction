@@ -673,6 +673,58 @@ export default {
       }
     }
 
+    // ── GET /api/files/:key (single track metadata) ─────────────────────────
+    if (path.startsWith("/api/files/") && request.method === "GET") {
+      const key = decodeURIComponent(path.slice("/api/files/".length));
+      if (!key) return jsonRes({ error: "No key provided" }, 400);
+
+      try {
+        const head = await env.JAMJUNCTION_BUCKET.head(key);
+        if (!head) return jsonRes({ error: "Track not found" }, 404);
+
+        return jsonRes({
+          key,
+          originalName: head.customMetadata?.originalName ?? key,
+          size: head.size,
+          uploaded: head.uploaded,
+          contentType: head.httpMetadata?.contentType ?? "audio/mpeg",
+          uploadedBy: head.customMetadata?.uploadedBy ?? "unknown",
+        });
+      } catch {
+        return jsonRes({ error: "Failed to load track" }, 500);
+      }
+    }
+
+    // ── PATCH /api/files/:key (rename track) ─────────────────────────────────
+    if (path.startsWith("/api/files/") && request.method === "PATCH") {
+      const key = decodeURIComponent(path.slice("/api/files/".length));
+      if (!key) return jsonRes({ error: "No key provided" }, 400);
+
+      let body;
+      try { body = await request.json(); } catch {
+        return jsonRes({ error: "Invalid JSON" }, 400);
+      }
+
+      const newName = typeof body.name === "string" ? body.name.trim() : "";
+      if (!newName) return jsonRes({ error: "Name is required" }, 400);
+
+      try {
+        const head = await env.JAMJUNCTION_BUCKET.head(key);
+        if (!head) return jsonRes({ error: "Track not found" }, 404);
+
+        // R2 doesn't support metadata-only updates, so copy the object in place
+        const obj = await env.JAMJUNCTION_BUCKET.get(key);
+        await env.JAMJUNCTION_BUCKET.put(key, obj.body, {
+          httpMetadata: head.httpMetadata,
+          customMetadata: { ...head.customMetadata, originalName: newName },
+        });
+
+        return jsonRes({ ok: true });
+      } catch {
+        return jsonRes({ error: "Rename failed" }, 500);
+      }
+    }
+
     // ── POST /api/upload  ────────────────────────────────────────────────────
     if (path === "/api/upload" && request.method === "POST") {
       let formData;
@@ -767,6 +819,15 @@ export default {
       } catch {
         return jsonRes({ error: "Delete failed" }, 500);
       }
+    }
+
+    // ── Track detail page ──────────────────────────────────────────────────
+    if (path.startsWith("/track/")) {
+      const assetUrl = new URL(request.url);
+      assetUrl.pathname = url.pathname.startsWith("/JamJunction")
+        ? "/JamJunction/track.html"
+        : "/track.html";
+      return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
     }
 
     // ── Static Assets ────────────────────────────────────────────────────────

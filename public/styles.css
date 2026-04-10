@@ -663,4 +663,134 @@ body {
   .search-input     { width: 100%; }
   .player-info      { display: none; }
   .file-meta        { gap: 0.4rem; }
+  .track-actions    { flex-direction: column; }
+}
+
+/* ── Track detail page ────────────────────────────────────────────────────── */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+  transition: color var(--transition);
+}
+
+.back-link:hover { color: var(--accent-light); }
+
+.back-link svg { width: 16px; height: 16px; }
+
+.track-detail { animation: fade-in 200ms ease; }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.track-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.track-name-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 1.25rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+
+.track-name-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.btn-save {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.btn-save:hover { background: #6d28d9; }
+
+.track-meta-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, "SF Mono", monospace;
+  margin-bottom: 1.5rem;
+}
+
+.track-player-section {
+  margin-bottom: 1.5rem;
+}
+
+.track-audio {
+  width: 100%;
+  height: 42px;
+  accent-color: var(--accent-light);
+  filter: brightness(0.9) saturate(0.7);
+}
+
+.track-visualizer-section {
+  margin-bottom: 1.5rem;
+}
+
+.track-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.btn-action:hover {
+  background: var(--surface-3);
+  border-color: var(--text-muted);
+}
+
+.btn-action svg { width: 16px; height: 16px; }
+
+.btn-action.btn-danger {
+  color: var(--error);
+  border-color: #ef444444;
+}
+
+.btn-action.btn-danger:hover {
+  background: #ef444422;
+  border-color: var(--error);
 }

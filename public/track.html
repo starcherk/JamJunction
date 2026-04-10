@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Track — JamJunction</title>
+    <script>
+      const b = window.location.pathname.startsWith("/JamJunction") ? "/JamJunction/" : "/";
+      document.write('<base href="' + b + '">');
+    </script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ── Header ──────────────────────────────────────────────── -->
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+            <circle cx="20" cy="20" r="18" stroke="currentColor" stroke-width="2"/>
+            <circle cx="20" cy="20" r="6"  fill="currentColor"/>
+            <path d="M20 2 A18 18 0 0 1 38 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M20 2 A18 18 0 0 0 2 20"  stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".4"/>
+          </svg>
+          <span class="logo-text">JamJunction</span>
+        </div>
+        <p class="tagline">Music collaboration, together.</p>
+        <button class="sign-out-btn" id="sign-out-btn" title="Sign out">Sign Out</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <!-- ── Back link ─────────────────────────────────────────── -->
+      <a id="back-link" class="back-link" href="/">
+        <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 0 1 1.04 1.08l-4.158 3.96H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd"/>
+        </svg>
+        Back to Library
+      </a>
+
+      <!-- ── Loading state ─────────────────────────────────────── -->
+      <div id="track-loading" class="loading-state" aria-live="polite">
+        <div class="skeleton-row"></div>
+        <div class="skeleton-row"></div>
+      </div>
+
+      <!-- ── Track detail ──────────────────────────────────────── -->
+      <section class="section track-detail hidden" id="track-detail">
+
+        <!-- Title (editable) -->
+        <div class="track-title-row">
+          <input
+            type="text"
+            id="track-name-input"
+            class="track-name-input"
+            aria-label="Track name"
+          />
+          <button class="btn-save hidden" id="save-name-btn">Save</button>
+        </div>
+
+        <div class="track-meta-row" id="track-meta"></div>
+
+        <!-- Player + Equalizer -->
+        <div class="track-player-section">
+          <audio id="audio-player" controls preload="none" class="track-audio" crossorigin="anonymous"></audio>
+        </div>
+
+        <section class="track-visualizer-section">
+          <div class="visualizer-header">
+            <h2 class="section-title">Equalizer</h2>
+            <button class="viz-toggle" id="viz-toggle" aria-label="Collapse equalizer" aria-expanded="true">
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+          <div class="visualizer-body" id="visualizer-body">
+            <canvas id="visualizer-canvas" class="visualizer-canvas" aria-hidden="true"></canvas>
+          </div>
+        </section>
+
+        <!-- Actions -->
+        <div class="track-actions">
+          <a id="download-link" class="btn-action" download>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z"/>
+              <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z"/>
+            </svg>
+            Download
+          </a>
+          <button class="btn-action btn-danger" id="delete-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"/>
+            </svg>
+            Delete Track
+          </button>
+        </div>
+
+      </section>
+    </main>
+
+    <!-- ── Notification toast ─────────────────────────────────────── -->
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script src="track.js" type="module"></script>
+  </body>
+</html>
