@@ -268,7 +268,7 @@ function portalHTML() {
     </div>
   </div>
   <script>
-    const BASE = window.location.pathname.replace(/\\\\/$/, "");
+    const BASE = window.location.pathname.replace(/\\/$/, "");
     const statusEl = document.getElementById("status");
     let userEmail = "";
 
