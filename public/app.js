@@ -7,6 +7,13 @@ const BASE = window.location.pathname.startsWith("/JamJunction")
   ? "/JamJunction"
   : "";
 
+// ─── Sign out ────────────────────────────────────────────────────────────────
+
+document.getElementById("sign-out-btn").addEventListener("click", async () => {
+  await fetch(BASE + "/api/auth/logout", { method: "POST" });
+  window.location.reload();
+});
+
 // ─── DOM refs ────────────────────────────────────────────────────────────────
 
 const dropZone       = document.getElementById("drop-zone");

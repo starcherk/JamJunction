@@ -16,3 +16,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: a8410787a143d8bd4c5efc94eea6d38b
+          command: deploy --env production
