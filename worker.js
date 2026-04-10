@@ -738,6 +738,16 @@ export default {
         headers.set("Accept-Ranges", "bytes");
         headers.set("Cache-Control", "private, max-age=3600");
 
+        if (object.range) {
+          const r = object.range;
+          const start = r.offset ?? 0;
+          const end = start + (r.length ?? object.size) - 1;
+          headers.set("Content-Range", `bytes ${start}-${end}/${object.size}`);
+          headers.set("Content-Length", String(r.length ?? object.size));
+        } else {
+          headers.set("Content-Length", String(object.size));
+        }
+
         const status = object.range ? 206 : 200;
         return new Response(object.body, { status, headers });
       } catch {
