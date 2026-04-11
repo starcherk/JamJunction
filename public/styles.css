@@ -1182,23 +1182,18 @@ body {
   height: 14px;
 }
 
-.btn-editor-save-new {
-  border-color: var(--accent);
-  color: var(--accent-light);
-}
-.btn-editor-save-new:hover {
-  background: rgba(124, 58, 237, 0.15);
-  color: #c4b5fd;
-}
-
-.btn-editor-apply {
+.btn-editor-branch {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
 }
-.btn-editor-apply:hover {
+.btn-editor-branch:hover {
   background: var(--accent-light);
   border-color: var(--accent-light);
+}
+.btn-editor-branch svg {
+  width: 14px;
+  height: 14px;
 }
 
 .btn-editor-reset {
@@ -1207,6 +1202,40 @@ body {
 
 @media (max-width: 540px) {
   .editor-controls { grid-template-columns: 1fr; }
+}
+
+/* ── Lineage ──────────────────────────────────────────────────────────────── */
+
+.track-lineage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.65rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.lineage-icon {
+  flex-shrink: 0;
+  color: var(--accent-light);
+}
+
+.lineage-link {
+  color: var(--accent-light);
+  text-decoration: none;
+  font-weight: 500;
+}
+.lineage-link:hover {
+  text-decoration: underline;
+}
+
+.lineage-deleted {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* ── Comments ─────────────────────────────────────────────────────────────── */

@@ -681,6 +681,7 @@ export default {
               uploadedBy: head?.customMetadata?.uploadedBy ?? "unknown",
               description: head?.customMetadata?.description ?? "",
               tags: head?.customMetadata?.tags ? head.customMetadata.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+              parentKey: head?.customMetadata?.parentKey ?? null,
             };
           })
         );
@@ -718,6 +719,7 @@ export default {
           uploadedBy: head.customMetadata?.uploadedBy ?? "unknown",
           description: head.customMetadata?.description ?? "",
           tags: head.customMetadata?.tags ? head.customMetadata.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          parentKey: head.customMetadata?.parentKey ?? null,
           comments,
           reactions,
           activity,
@@ -955,14 +957,18 @@ export default {
 
       const safeName = file.name.replace(/[^a-zA-Z0-9._\- ]/g, "_");
       const key = `${Date.now()}-${safeName}`;
+      const parentKey = formData.get("parentKey") || "";
 
       try {
+        const customMeta = {
+          originalName: file.name,
+          uploadedBy: session.name || session.email,
+        };
+        if (parentKey) customMeta.parentKey = parentKey;
+
         await env.JAMJUNCTION_BUCKET.put(key, file.stream(), {
           httpMetadata: { contentType: file.type },
-          customMetadata: {
-            originalName: file.name,
-            uploadedBy: session.name || session.email,
-          },
+          customMetadata: customMeta,
         });
         return jsonRes({ ok: true, key });
       } catch {

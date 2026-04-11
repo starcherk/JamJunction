@@ -47,7 +47,7 @@ const commentTimeClear = document.getElementById("comment-time-clear");
 const playerTimeline  = document.getElementById("player-timeline");
 const timelineMarkers = document.getElementById("timeline-markers");
 
-const replaceInput    = document.getElementById("replace-input");
+const trackLineage    = document.getElementById("track-lineage");
 
 const activityList    = document.getElementById("activity-list");
 const activityEmpty   = document.getElementById("activity-empty");
@@ -265,7 +265,10 @@ async function loadTrack() {
     downloadLink.href = `${BASE}/api/download/${encodeURIComponent(track.key)}`;
     downloadLink.download = savedName;
 
-
+    // Lineage
+    if (track.parentKey) {
+      renderLineage(track.parentKey);
+    }
 
     // Comments
     renderComments(track.comments || []);
@@ -547,39 +550,6 @@ async function deleteComment(id) {
   }
 }
 
-// ─── Replace file ─────────────────────────────────────────────────────────────
-
-replaceInput.addEventListener("change", async () => {
-  const file = replaceInput.files[0];
-  if (!file) return;
-
-  if (!confirm(`Replace the audio with "${file.name}"?`)) {
-    replaceInput.value = "";
-    return;
-  }
-
-  const form = new FormData();
-  form.append("file", file);
-
-  try {
-    showToast("Uploading replacement…", "info");
-    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/replace`, {
-      method: "POST",
-      body: form,
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Replace failed");
-    }
-    showToast("File replaced! Reloading…", "success");
-    setTimeout(() => location.reload(), 1000);
-  } catch (err) {
-    showToast(err.message || "Replace failed.", "error");
-  } finally {
-    replaceInput.value = "";
-  }
-});
-
 // ─── Activity feed ────────────────────────────────────────────────────────────
 
 function renderActivity(activity) {
@@ -667,8 +637,7 @@ const fadeOutVal        = document.getElementById("editor-fade-out-val");
 const volumeVal         = document.getElementById("editor-volume-val");
 const previewBtn        = document.getElementById("editor-preview-btn");
 const resetBtn          = document.getElementById("editor-reset-btn");
-const saveNewBtn        = document.getElementById("editor-save-new-btn");
-const applyBtn          = document.getElementById("editor-apply-btn");
+const branchBtn         = document.getElementById("editor-branch-btn");
 
 let editorBuffer   = null;  // decoded AudioBuffer
 let editorPeaks    = null;  // pre-computed peaks for waveform drawing
@@ -1064,22 +1033,23 @@ function stopEditorPreview() {
   editorPlayhead.style.display = "none";
 }
 
-// Save as New: encode to WAV, upload as a new track
-saveNewBtn.addEventListener("click", async () => {
+// Branch: encode to WAV, upload as a new track linked to parent
+branchBtn.addEventListener("click", async () => {
   const processed = processAudio();
-  if (!processed) { showToast("Nothing to save.", "error"); return; }
+  if (!processed) { showToast("Nothing to branch.", "error"); return; }
 
-  saveNewBtn.disabled = true;
-  saveNewBtn.textContent = "Processing…";
+  branchBtn.disabled = true;
+  branchBtn.textContent = "Processing…";
 
   try {
     const wavBlob = encodeWAV(processed);
     const baseName = savedName.replace(/\.[^.]+$/, "");
-    const file = new File([wavBlob], `${baseName} (edited).wav`, { type: "audio/wav" });
+    const file = new File([wavBlob], `${baseName} (branch).wav`, { type: "audio/wav" });
     const form = new FormData();
     form.append("file", file);
+    form.append("parentKey", trackKey);
 
-    saveNewBtn.textContent = "Uploading…";
+    branchBtn.textContent = "Uploading…";
 
     const res = await fetch(`${BASE}/api/upload`, {
       method: "POST",
@@ -1091,243 +1061,46 @@ saveNewBtn.addEventListener("click", async () => {
     }
 
     const { key } = await res.json();
-    showToast("Saved as new track!", "success");
+    showToast("Branch created!", "success");
     setTimeout(() => { window.location.href = `${BASE}/track.html?file=${encodeURIComponent(key)}`; }, 1000);
   } catch (err) {
-    showToast(err.message || "Failed to save new track.", "error");
+    showToast(err.message || "Failed to create branch.", "error");
   } finally {
-    saveNewBtn.disabled = false;
-    saveNewBtn.textContent = "Save as New";
+    branchBtn.disabled = false;
+    branchBtn.innerHTML = `<svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" aria-hidden="true"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"/></svg> Branch`;
   }
 });
 
-// Apply & Save: encode to WAV, upload as replacement
-applyBtn.addEventListener("click", async () => {
-  const processed = processAudio();
-  if (!processed) { showToast("Nothing to apply.", "error"); return; }
+// ─── Lineage ──────────────────────────────────────────────────────────────────
 
-  if (!confirm("Apply edits and replace the audio file? This can't be undone.")) return;
-
-  applyBtn.disabled = true;
-  applyBtn.textContent = "Processing…";
-
+async function renderLineage(parentKey) {
   try {
-    const wavBlob = encodeWAV(processed);
-    const baseName = savedName.replace(/\.[^.]+$/, "");
-    const file = new File([wavBlob], `${baseName}.wav`, { type: "audio/wav" });
-    const form = new FormData();
-    form.append("file", file);
-
-    applyBtn.textContent = "Uploading…";
-
-    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/replace`, {
-      method: "POST",
-      body: form,
-    });
+    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(parentKey)}`);
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Replace failed");
+      // Parent deleted — still show lineage but as "(deleted)"
+      trackLineage.innerHTML = `
+        <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" class="lineage-icon" aria-hidden="true">
+          <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"/>
+        </svg>
+        Branched from <span class="lineage-deleted">(deleted track)</span>
+      `;
+      trackLineage.classList.remove("hidden");
+      return;
     }
 
-    showToast("Edits applied! Reloading…", "success");
-    setTimeout(() => location.reload(), 1000);
-  } catch (err) {
-    showToast(err.message || "Failed to apply edits.", "error");
-  } finally {
-    applyBtn.disabled = false;
-    applyBtn.textContent = "Apply & Save";
-  }
-});
-
-// ─── Mic Recording (Record Replace) ──────────────────────────────────────────
-
-const recordReplaceBtn   = document.getElementById("record-replace-btn");
-const recordPanel        = document.getElementById("record-panel");
-const recordCancelBtn    = document.getElementById("record-cancel-btn");
-const recordStartBtn     = document.getElementById("record-start-btn");
-const recordStopBtn      = document.getElementById("record-stop-btn");
-const recordTimerEl      = document.getElementById("record-timer");
-const recordCanvas       = document.getElementById("record-level-canvas");
-const recordPreview      = document.getElementById("record-preview");
-const recordPreviewAudio = document.getElementById("record-preview-audio");
-const recordUploadBtn    = document.getElementById("record-upload-btn");
-const recordDiscardBtn   = document.getElementById("record-discard-btn");
-const recCtx             = recordCanvas.getContext("2d");
-
-let recStream      = null;
-let recorder       = null;
-let recChunks      = [];
-let recStartTime   = 0;
-let recTimerInterval = null;
-let recAnimId      = null;
-let recAnalyser    = null;
-let recAudioCtx    = null;
-let recordedBlob   = null;
-
-function formatRecTime(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-}
-
-function resizeRecCanvas() {
-  const rect = recordCanvas.getBoundingClientRect();
-  if (!rect.width || !rect.height) return;
-  recordCanvas.width  = rect.width * window.devicePixelRatio;
-  recordCanvas.height = rect.height * window.devicePixelRatio;
-  recCtx.setTransform(1, 0, 0, 1, 0, 0);
-  recCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
-}
-
-function drawRecLevel() {
-  const w = recordCanvas.getBoundingClientRect().width;
-  const h = recordCanvas.getBoundingClientRect().height;
-  recCtx.clearRect(0, 0, w, h);
-
-  if (!recAnalyser) { recAnimId = requestAnimationFrame(drawRecLevel); return; }
-
-  const data = new Uint8Array(recAnalyser.frequencyBinCount);
-  recAnalyser.getByteFrequencyData(data);
-
-  const barCount = 48;
-  const gap = 3;
-  const barW = (w - gap * (barCount - 1)) / barCount;
-
-  for (let i = 0; i < barCount; i++) {
-    const val = (data[i] || 0) / 255;
-    const barH = Math.max(2, val * h);
-    const x = i * (barW + gap);
-    const y = h - barH;
-    const grad = recCtx.createLinearGradient(x, y, x, h);
-    grad.addColorStop(0, "#ef4444");
-    grad.addColorStop(1, "#dc2626");
-    recCtx.fillStyle = grad;
-    recCtx.beginPath();
-    recCtx.roundRect(x, y, barW, barH, 2);
-    recCtx.fill();
-  }
-
-  recAnimId = requestAnimationFrame(drawRecLevel);
-}
-
-function resetRecordUI() {
-  recordStartBtn.classList.remove("hidden");
-  recordStopBtn.classList.add("hidden");
-  recordPreview.classList.add("hidden");
-  recordTimerEl.textContent = "0:00";
-  recordedBlob = null;
-  recCtx.clearRect(0, 0, recordCanvas.getBoundingClientRect().width, recordCanvas.getBoundingClientRect().height);
-}
-
-function stopRecording(discard) {
-  if (recorder?.state === "recording") recorder.stop();
-  clearInterval(recTimerInterval);
-  cancelAnimationFrame(recAnimId);
-  recAnimId = null;
-  if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
-  if (recAudioCtx) { recAudioCtx.close().catch(() => {}); recAudioCtx = null; recAnalyser = null; }
-  if (discard) {
-    recordedBlob = null;
-    recordPreview.classList.add("hidden");
-    if (recordPreviewAudio.src) { URL.revokeObjectURL(recordPreviewAudio.src); recordPreviewAudio.src = ""; }
-  }
-}
-
-function onRecordingDone() {
-  stopRecording(false);
-  if (!recChunks.length) return;
-  recordedBlob = new Blob(recChunks, { type: recChunks[0].type || "audio/webm" });
-  recordPreviewAudio.src = URL.createObjectURL(recordedBlob);
-  recordPreview.classList.remove("hidden");
-  recordStopBtn.classList.add("hidden");
-}
-
-recordReplaceBtn.addEventListener("click", () => {
-  recordPanel.classList.remove("hidden");
-  resetRecordUI();
-  recordPanel.scrollIntoView({ behavior: "smooth" });
-});
-
-recordCancelBtn.addEventListener("click", () => {
-  stopRecording(true);
-  recordPanel.classList.add("hidden");
-});
-
-recordStartBtn.addEventListener("click", async () => {
-  try {
-    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const parent = await res.json();
+    const parentName = parent.originalName || parentKey;
+    trackLineage.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" class="lineage-icon" aria-hidden="true">
+        <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"/>
+      </svg>
+      Branched from <a href="${BASE}/track.html?file=${encodeURIComponent(parentKey)}" class="lineage-link">${escapeHtml(parentName)}</a>
+    `;
+    trackLineage.classList.remove("hidden");
   } catch {
-    showToast("Microphone access denied.", "error");
-    return;
+    // Silently fail — lineage is non-critical
   }
+}
 
-  recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const source = recAudioCtx.createMediaStreamSource(recStream);
-  recAnalyser = recAudioCtx.createAnalyser();
-  recAnalyser.fftSize = 256;
-  source.connect(recAnalyser);
+// ─── Lineage ──────────────────────────────────────────────────────────────────
 
-  recChunks = [];
-  const mimeType = MediaRecorder.isTypeSupported("audio/mp4")
-    ? "audio/mp4"
-    : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-  recorder = new MediaRecorder(recStream, { mimeType });
-  recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunks.push(e.data); };
-  recorder.onstop = () => onRecordingDone();
-
-  recorder.start(100);
-  recStartTime = Date.now();
-  recTimerInterval = setInterval(() => {
-    recordTimerEl.textContent = formatRecTime(Date.now() - recStartTime);
-  }, 250);
-
-  recordStartBtn.classList.add("hidden");
-  recordStopBtn.classList.remove("hidden");
-  resizeRecCanvas();
-  recAnimId = requestAnimationFrame(drawRecLevel);
-});
-
-recordStopBtn.addEventListener("click", () => {
-  if (recorder?.state === "recording") recorder.stop();
-});
-
-recordUploadBtn.addEventListener("click", async () => {
-  if (!recordedBlob) return;
-  if (!confirm("Replace the current audio with this recording?")) return;
-
-  const ext = recordedBlob.type.includes("mp4") ? ".m4a" : ".webm";
-  const file = new File([recordedBlob], "recording" + ext, { type: recordedBlob.type });
-  const form = new FormData();
-  form.append("file", file);
-
-  recordUploadBtn.disabled = true;
-  recordUploadBtn.textContent = "Uploading…";
-
-  try {
-    showToast("Uploading recorded replacement…", "info");
-    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/replace`, {
-      method: "POST",
-      body: form,
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Replace failed");
-    }
-    showToast("Replaced! Reloading…", "success");
-    setTimeout(() => location.reload(), 1000);
-  } catch (err) {
-    showToast(err.message || "Replace failed.", "error");
-  } finally {
-    recordUploadBtn.disabled = false;
-    recordUploadBtn.textContent = "Upload as Replacement";
-  }
-});
-
-recordDiscardBtn.addEventListener("click", () => {
-  if (recordPreviewAudio.src) URL.revokeObjectURL(recordPreviewAudio.src);
-  recordPreviewAudio.src = "";
-  recordedBlob = null;
-  resetRecordUI();
-});
