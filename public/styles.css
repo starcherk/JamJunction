@@ -946,48 +946,6 @@ body {
   transform: translateX(-50%) scaleY(1.2);
 }
 
-/* ── Reactions ────────────────────────────────────────────────────────────── */
-
-.reactions-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1.5rem;
-}
-
-.reaction-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: 100px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: background var(--transition), border-color var(--transition);
-}
-
-.reaction-btn:hover {
-  background: var(--surface-3);
-  border-color: var(--text-muted);
-}
-
-.reaction-btn.active {
-  border-color: var(--accent);
-  background: var(--accent-glow);
-  color: var(--text);
-}
-
-.reaction-emoji { font-size: 1rem; }
-
-.reaction-count {
-  font-size: 0.75rem;
-  font-weight: 600;
-  font-family: ui-monospace, "SF Mono", monospace;
-}
-
 /* ── Comments ─────────────────────────────────────────────────────────────── */
 
 .comments-section {

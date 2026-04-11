@@ -35,7 +35,7 @@ const saveDescBtn     = document.getElementById("save-desc-btn");
 const tagsList        = document.getElementById("tags-list");
 const tagInput        = document.getElementById("tag-input");
 
-const reactionsBar    = document.getElementById("reactions-bar");
+
 
 const commentInput    = document.getElementById("comment-input");
 const commentSubmit   = document.getElementById("comment-submit");
@@ -265,8 +265,7 @@ async function loadTrack() {
     downloadLink.href = `${BASE}/api/download/${encodeURIComponent(track.key)}`;
     downloadLink.download = savedName;
 
-    // Reactions
-    renderReactions(track.reactions || {});
+
 
     // Comments
     renderComments(track.comments || []);
@@ -388,39 +387,6 @@ async function saveTags() {
     });
   } catch {
     showToast("Failed to save tags.", "error");
-  }
-}
-
-// ─── Reactions ────────────────────────────────────────────────────────────────
-
-const REACTION_EMOJIS = ["🔥", "👍", "🎵", "💜", "🎧", "🔧"];
-
-function renderReactions(reactions) {
-  reactionsBar.innerHTML = "";
-  for (const emoji of REACTION_EMOJIS) {
-    const users = reactions[emoji] || [];
-    const myReaction = currentUser && users.some(u => u.email === currentUser.email);
-    const btn = document.createElement("button");
-    btn.className = `reaction-btn${myReaction ? " active" : ""}`;
-    btn.innerHTML = `<span class="reaction-emoji">${emoji}</span>${users.length ? `<span class="reaction-count">${users.length}</span>` : ""}`;
-    btn.title = users.map(u => u.name).join(", ") || "No reactions yet";
-    btn.addEventListener("click", () => toggleReaction(emoji));
-    reactionsBar.appendChild(btn);
-  }
-}
-
-async function toggleReaction(emoji) {
-  try {
-    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/reactions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ emoji }),
-    });
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    renderReactions(data.reactions);
-  } catch {
-    showToast("Reaction failed.", "error");
   }
 }
 
