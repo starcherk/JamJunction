@@ -641,6 +641,466 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
+// ─── Audio Editor ─────────────────────────────────────────────────────────────
+
+const editBtn           = document.getElementById("edit-btn");
+const editorPanel       = document.getElementById("editor-panel");
+const editorClose       = document.getElementById("editor-close");
+const editorWaveformWrap = document.getElementById("editor-waveform-wrap");
+const editorWaveform    = document.getElementById("editor-waveform");
+const editorCtx         = editorWaveform.getContext("2d");
+const handleLeft        = document.getElementById("editor-handle-left");
+const handleRight       = document.getElementById("editor-handle-right");
+const trimLeftOverlay   = document.getElementById("editor-trim-left");
+const trimRightOverlay  = document.getElementById("editor-trim-right");
+const fadeInOverlay     = document.getElementById("editor-fade-in-overlay");
+const fadeOutOverlay    = document.getElementById("editor-fade-out-overlay");
+const editorPlayhead    = document.getElementById("editor-playhead");
+const trimStartLabel    = document.getElementById("editor-trim-start-label");
+const trimEndLabel      = document.getElementById("editor-trim-end-label");
+const durationLabel     = document.getElementById("editor-duration-label");
+const fadeInSlider      = document.getElementById("editor-fade-in");
+const fadeOutSlider     = document.getElementById("editor-fade-out");
+const volumeSlider      = document.getElementById("editor-volume");
+const fadeInVal         = document.getElementById("editor-fade-in-val");
+const fadeOutVal        = document.getElementById("editor-fade-out-val");
+const volumeVal         = document.getElementById("editor-volume-val");
+const previewBtn        = document.getElementById("editor-preview-btn");
+const resetBtn          = document.getElementById("editor-reset-btn");
+const applyBtn          = document.getElementById("editor-apply-btn");
+
+let editorBuffer   = null;  // decoded AudioBuffer
+let editorPeaks    = null;  // pre-computed peaks for waveform drawing
+let trimStart      = 0;     // 0..1 fraction
+let trimEnd        = 1;     // 0..1 fraction
+let editorPreviewCtx  = null; // AudioContext for preview
+let editorPreviewSrc  = null; // AudioBufferSourceNode
+let editorPreviewAnim = null;
+let editorPreviewStartTime = 0;
+let isEditorPreviewing = false;
+
+// Open editor
+editBtn.addEventListener("click", async () => {
+  editorPanel.classList.remove("hidden");
+  editorPanel.scrollIntoView({ behavior: "smooth" });
+  editBtn.disabled = true;
+  editBtn.textContent = "Loading audio…";
+
+  try {
+    // Fetch raw audio bytes
+    const res = await fetch(`${BASE}/api/download/${encodeURIComponent(trackKey)}`);
+    if (!res.ok) throw new Error();
+    const arrayBuf = await res.arrayBuffer();
+
+    // Decode
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    editorBuffer = await ctx.decodeAudioData(arrayBuf);
+    ctx.close();
+
+    // Compute peaks
+    editorPeaks = computePeaks(editorBuffer, 2000);
+
+    // Reset state
+    trimStart = 0;
+    trimEnd   = 1;
+    fadeInSlider.value  = 0;
+    fadeOutSlider.value = 0;
+    volumeSlider.value  = 100;
+    updateEditorUI();
+    resizeEditorCanvas();
+    drawEditorWaveform();
+  } catch {
+    showToast("Failed to load audio for editing.", "error");
+    editorPanel.classList.add("hidden");
+  } finally {
+    editBtn.disabled = false;
+    editBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z"/></svg> Edit Audio`;
+  }
+});
+
+// Close editor
+editorClose.addEventListener("click", () => {
+  stopEditorPreview();
+  editorPanel.classList.add("hidden");
+});
+
+// Compute peaks from AudioBuffer
+function computePeaks(buffer, numPeaks) {
+  const ch = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(ch.length / numPeaks));
+  const peaks = new Float32Array(numPeaks);
+  for (let i = 0; i < numPeaks; i++) {
+    let max = 0;
+    const start = i * step;
+    const end = Math.min(start + step, ch.length);
+    for (let j = start; j < end; j++) {
+      const abs = Math.abs(ch[j]);
+      if (abs > max) max = abs;
+    }
+    peaks[i] = max;
+  }
+  return peaks;
+}
+
+// Resize canvas to match container
+function resizeEditorCanvas() {
+  const rect = editorWaveformWrap.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  editorWaveform.width  = rect.width * window.devicePixelRatio;
+  editorWaveform.height = rect.height * window.devicePixelRatio;
+  editorCtx.setTransform(1, 0, 0, 1, 0, 0);
+  editorCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+// Draw the waveform
+function drawEditorWaveform() {
+  if (!editorPeaks) return;
+
+  const w = editorWaveformWrap.getBoundingClientRect().width;
+  const h = editorWaveformWrap.getBoundingClientRect().height;
+  editorCtx.clearRect(0, 0, w, h);
+
+  const barCount = Math.min(editorPeaks.length, Math.floor(w / 3));
+  const gap = 1.5;
+  const barW = (w - gap * (barCount - 1)) / barCount;
+  const step = editorPeaks.length / barCount;
+
+  for (let i = 0; i < barCount; i++) {
+    const idx = Math.floor(i * step);
+    const val = editorPeaks[idx] || 0;
+    const barH = Math.max(1, val * h * 0.9);
+    const x = i * (barW + gap);
+    const y = (h - barH) / 2;
+
+    // Dim bars outside trim range
+    const pct = i / barCount;
+    if (pct < trimStart || pct > trimEnd) {
+      editorCtx.fillStyle = "#7c3aed22";
+    } else {
+      const grad = editorCtx.createLinearGradient(x, y, x, y + barH);
+      grad.addColorStop(0, "#a78bfa");
+      grad.addColorStop(1, "#7c3aed");
+      editorCtx.fillStyle = grad;
+    }
+
+    editorCtx.beginPath();
+    editorCtx.roundRect(x, y, barW, barH, 1);
+    editorCtx.fill();
+  }
+}
+
+// Update all editor UI: overlays, labels, fade indicators
+function updateEditorUI() {
+  if (!editorBuffer) return;
+
+  const dur = editorBuffer.duration;
+  const selDur = (trimEnd - trimStart) * dur;
+
+  trimStartLabel.textContent = formatTime(trimStart * dur);
+  trimEndLabel.textContent   = formatTime(trimEnd * dur);
+  durationLabel.textContent  = `${formatTime(selDur)} selected`;
+
+  // Trim overlays
+  trimLeftOverlay.style.width  = `${trimStart * 100}%`;
+  trimRightOverlay.style.width = `${(1 - trimEnd) * 100}%`;
+
+  // Fade overlays (relative to visible region)
+  const fadeIn = parseFloat(fadeInSlider.value);
+  const fadeOut = parseFloat(fadeOutSlider.value);
+  const fadeInPct = selDur > 0 ? Math.min(fadeIn / selDur, 1) : 0;
+  const fadeOutPct = selDur > 0 ? Math.min(fadeOut / selDur, 1) : 0;
+  const regionWidth = (trimEnd - trimStart) * 100;
+
+  fadeInOverlay.style.left  = `${trimStart * 100}%`;
+  fadeInOverlay.style.width = `${fadeInPct * regionWidth}%`;
+  fadeOutOverlay.style.right = `${(1 - trimEnd) * 100}%`;
+  fadeOutOverlay.style.width = `${fadeOutPct * regionWidth}%`;
+
+  // Slider labels
+  fadeInVal.textContent  = `${parseFloat(fadeInSlider.value).toFixed(1)}s`;
+  fadeOutVal.textContent = `${parseFloat(fadeOutSlider.value).toFixed(1)}s`;
+  volumeVal.textContent  = `${volumeSlider.value}%`;
+}
+
+// Slider change events
+fadeInSlider.addEventListener("input",  () => { updateEditorUI(); drawEditorWaveform(); });
+fadeOutSlider.addEventListener("input", () => { updateEditorUI(); drawEditorWaveform(); });
+volumeSlider.addEventListener("input",  () => updateEditorUI());
+
+// Handle dragging for trim handles
+function setupHandleDrag(handle, side) {
+  let dragging = false;
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const rect = editorWaveformWrap.getBoundingClientRect();
+    let pct = (clientX - rect.left) / rect.width;
+    pct = Math.max(0, Math.min(1, pct));
+
+    if (side === "left") {
+      trimStart = Math.min(pct, trimEnd - 0.01);
+    } else {
+      trimEnd = Math.max(pct, trimStart + 0.01);
+    }
+
+    updateEditorUI();
+    drawEditorWaveform();
+  };
+
+  const onUp = () => {
+    dragging = false;
+    handle.classList.remove("dragging");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    document.removeEventListener("touchmove", onMove);
+    document.removeEventListener("touchend", onUp);
+  };
+
+  handle.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add("dragging");
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+
+  handle.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    dragging = true;
+    handle.classList.add("dragging");
+    document.addEventListener("touchmove", onMove);
+    document.addEventListener("touchend", onUp);
+  });
+}
+
+setupHandleDrag(handleLeft, "left");
+setupHandleDrag(handleRight, "right");
+
+// Click waveform to seek preview playhead
+editorWaveformWrap.addEventListener("click", (e) => {
+  if (e.target.closest(".editor-handle")) return;
+  const rect = editorWaveformWrap.getBoundingClientRect();
+  let pct = (e.clientX - rect.left) / rect.width;
+  pct = Math.max(trimStart, Math.min(trimEnd, pct));
+
+  // Show a static playhead marker
+  editorPlayhead.style.display = "block";
+  editorPlayhead.style.left = `${pct * 100}%`;
+});
+
+window.addEventListener("resize", () => {
+  resizeEditorCanvas();
+  drawEditorWaveform();
+});
+
+// Reset editor
+resetBtn.addEventListener("click", () => {
+  trimStart = 0;
+  trimEnd = 1;
+  fadeInSlider.value = 0;
+  fadeOutSlider.value = 0;
+  volumeSlider.value = 100;
+  handleLeft.style.left = "0";
+  handleRight.style.right = "0";
+  editorPlayhead.style.display = "none";
+  updateEditorUI();
+  drawEditorWaveform();
+});
+
+// Process audio: trim, fade, volume → new AudioBuffer
+function processAudio() {
+  if (!editorBuffer) return null;
+
+  const sr = editorBuffer.sampleRate;
+  const numCh = editorBuffer.numberOfChannels;
+  const totalSamples = editorBuffer.length;
+
+  const startSample = Math.floor(trimStart * totalSamples);
+  const endSample   = Math.floor(trimEnd * totalSamples);
+  const length      = endSample - startSample;
+
+  if (length <= 0) return null;
+
+  const offCtx = new OfflineAudioContext(numCh, length, sr);
+  const newBuf = offCtx.createBuffer(numCh, length, sr);
+
+  const fadeInSamples  = Math.floor(parseFloat(fadeInSlider.value) * sr);
+  const fadeOutSamples = Math.floor(parseFloat(fadeOutSlider.value) * sr);
+  const vol = parseInt(volumeSlider.value) / 100;
+
+  for (let ch = 0; ch < numCh; ch++) {
+    const src = editorBuffer.getChannelData(ch);
+    const dst = newBuf.getChannelData(ch);
+
+    for (let i = 0; i < length; i++) {
+      let sample = src[startSample + i] * vol;
+
+      // Fade in
+      if (i < fadeInSamples) {
+        sample *= i / fadeInSamples;
+      }
+
+      // Fade out
+      const fromEnd = length - 1 - i;
+      if (fromEnd < fadeOutSamples) {
+        sample *= fromEnd / fadeOutSamples;
+      }
+
+      dst[i] = sample;
+    }
+  }
+
+  return newBuf;
+}
+
+// Encode AudioBuffer to WAV
+function encodeWAV(buffer) {
+  const numCh = buffer.numberOfChannels;
+  const sr = buffer.sampleRate;
+  const length = buffer.length;
+  const bytesPerSample = 2; // 16-bit
+  const blockAlign = numCh * bytesPerSample;
+  const dataSize = length * blockAlign;
+  const headerSize = 44;
+
+  const wav = new ArrayBuffer(headerSize + dataSize);
+  const view = new DataView(wav);
+
+  // RIFF header
+  writeString(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, "WAVE");
+
+  // fmt chunk
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, sr, true);
+  view.setUint32(28, sr * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true); // bits per sample
+
+  // data chunk
+  writeString(view, 36, "data");
+  view.setUint32(40, dataSize, true);
+
+  // Interleave channels
+  let offset = 44;
+  for (let i = 0; i < length; i++) {
+    for (let ch = 0; ch < numCh; ch++) {
+      const sample = buffer.getChannelData(ch)[i];
+      const clamped = Math.max(-1, Math.min(1, sample));
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF, true);
+      offset += 2;
+    }
+  }
+
+  return new Blob([wav], { type: "audio/wav" });
+}
+
+function writeString(view, offset, str) {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i));
+  }
+}
+
+// Preview: play the processed audio
+previewBtn.addEventListener("click", () => {
+  if (isEditorPreviewing) {
+    stopEditorPreview();
+    return;
+  }
+
+  const processed = processAudio();
+  if (!processed) return;
+
+  editorPreviewCtx = new (window.AudioContext || window.webkitAudioContext)();
+  editorPreviewSrc = editorPreviewCtx.createBufferSource();
+  editorPreviewSrc.buffer = processed;
+  editorPreviewSrc.connect(editorPreviewCtx.destination);
+  editorPreviewSrc.start();
+  isEditorPreviewing = true;
+  editorPreviewStartTime = editorPreviewCtx.currentTime;
+
+  previewBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M5.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75A.75.75 0 0 0 7.25 3h-1.5ZM12.75 3a.75.75 0 0 0-.75.75v12.5c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75h-1.5Z"/></svg> Stop`;
+
+  // Animate playhead
+  function animPlayhead() {
+    if (!isEditorPreviewing || !editorPreviewCtx) return;
+    const elapsed = editorPreviewCtx.currentTime - editorPreviewStartTime;
+    const dur = processed.duration;
+    if (elapsed >= dur) {
+      stopEditorPreview();
+      return;
+    }
+    const pct = trimStart + (elapsed / editorBuffer.duration);
+    editorPlayhead.style.display = "block";
+    editorPlayhead.style.left = `${Math.min(pct * 100, trimEnd * 100)}%`;
+    editorPreviewAnim = requestAnimationFrame(animPlayhead);
+  }
+  editorPreviewAnim = requestAnimationFrame(animPlayhead);
+
+  editorPreviewSrc.onended = () => stopEditorPreview();
+});
+
+function stopEditorPreview() {
+  isEditorPreviewing = false;
+  if (editorPreviewSrc) {
+    try { editorPreviewSrc.stop(); } catch {}
+    editorPreviewSrc = null;
+  }
+  if (editorPreviewCtx) {
+    editorPreviewCtx.close().catch(() => {});
+    editorPreviewCtx = null;
+  }
+  if (editorPreviewAnim) {
+    cancelAnimationFrame(editorPreviewAnim);
+    editorPreviewAnim = null;
+  }
+  previewBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg> Preview`;
+  editorPlayhead.style.display = "none";
+}
+
+// Apply & Save: encode to WAV, upload as replacement
+applyBtn.addEventListener("click", async () => {
+  const processed = processAudio();
+  if (!processed) { showToast("Nothing to apply.", "error"); return; }
+
+  if (!confirm("Apply edits and replace the audio file? This can't be undone.")) return;
+
+  applyBtn.disabled = true;
+  applyBtn.textContent = "Processing…";
+
+  try {
+    const wavBlob = encodeWAV(processed);
+    const baseName = savedName.replace(/\.[^.]+$/, "");
+    const file = new File([wavBlob], `${baseName}.wav`, { type: "audio/wav" });
+    const form = new FormData();
+    form.append("file", file);
+
+    applyBtn.textContent = "Uploading…";
+
+    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/replace`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Replace failed");
+    }
+
+    showToast("Edits applied! Reloading…", "success");
+    setTimeout(() => location.reload(), 1000);
+  } catch (err) {
+    showToast(err.message || "Failed to apply edits.", "error");
+  } finally {
+    applyBtn.disabled = false;
+    applyBtn.textContent = "Apply & Save";
+  }
+});
+
 // ─── Mic Recording (Record Replace) ──────────────────────────────────────────
 
 const recordReplaceBtn   = document.getElementById("record-replace-btn");

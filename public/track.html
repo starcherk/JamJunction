@@ -106,6 +106,12 @@
             </svg>
             Download
           </a>
+          <button class="btn-action" id="edit-btn">
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z"/>
+            </svg>
+            Edit Audio
+          </button>
           <label class="btn-action" id="replace-label">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H4.28a.75.75 0 0 0-.75.75v3.952a.75.75 0 0 0 1.5 0v-2.146l.312.311a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.394Zm-10.624-2.85a5.5 5.5 0 0 1 9.201-2.465l.312.31H11.77a.75.75 0 0 0 0 1.5h3.951a.75.75 0 0 0 .75-.75V3.217a.75.75 0 0 0-1.5 0v2.146l-.311-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.449.386Z" clip-rule="evenodd"/>
@@ -126,6 +132,67 @@
             </svg>
             Delete Track
           </button>
+        </div>
+
+        <!-- Audio Editor -->
+        <div id="editor-panel" class="editor-panel hidden">
+          <div class="editor-header">
+            <h3 class="editor-title">Audio Editor</h3>
+            <button class="editor-close" id="editor-close" aria-label="Close editor">&times;</button>
+          </div>
+
+          <!-- Waveform with trim handles -->
+          <div class="editor-waveform-wrap" id="editor-waveform-wrap">
+            <canvas id="editor-waveform" class="editor-waveform"></canvas>
+            <div class="editor-handle editor-handle-left" id="editor-handle-left">
+              <div class="editor-handle-grip"></div>
+            </div>
+            <div class="editor-handle editor-handle-right" id="editor-handle-right">
+              <div class="editor-handle-grip"></div>
+            </div>
+            <div class="editor-trim-overlay editor-trim-left" id="editor-trim-left"></div>
+            <div class="editor-trim-overlay editor-trim-right" id="editor-trim-right"></div>
+            <div class="editor-fade-overlay editor-fade-in" id="editor-fade-in-overlay"></div>
+            <div class="editor-fade-overlay editor-fade-out" id="editor-fade-out-overlay"></div>
+            <div class="editor-playhead" id="editor-playhead"></div>
+          </div>
+
+          <div class="editor-time-row">
+            <span id="editor-trim-start-label">0:00</span>
+            <span id="editor-duration-label">—</span>
+            <span id="editor-trim-end-label">0:00</span>
+          </div>
+
+          <!-- Controls -->
+          <div class="editor-controls">
+            <div class="editor-control-group">
+              <label class="editor-label">Fade In</label>
+              <input type="range" id="editor-fade-in" class="editor-slider" min="0" max="10" step="0.1" value="0" />
+              <span class="editor-value" id="editor-fade-in-val">0.0s</span>
+            </div>
+            <div class="editor-control-group">
+              <label class="editor-label">Fade Out</label>
+              <input type="range" id="editor-fade-out" class="editor-slider" min="0" max="10" step="0.1" value="0" />
+              <span class="editor-value" id="editor-fade-out-val">0.0s</span>
+            </div>
+            <div class="editor-control-group">
+              <label class="editor-label">Volume</label>
+              <input type="range" id="editor-volume" class="editor-slider" min="0" max="200" step="1" value="100" />
+              <span class="editor-value" id="editor-volume-val">100%</span>
+            </div>
+          </div>
+
+          <!-- Editor actions -->
+          <div class="editor-actions">
+            <button class="btn-editor btn-editor-preview" id="editor-preview-btn">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/>
+              </svg>
+              Preview
+            </button>
+            <button class="btn-editor btn-editor-reset" id="editor-reset-btn">Reset</button>
+            <button class="btn-editor btn-editor-apply" id="editor-apply-btn">Apply &amp; Save</button>
+          </div>
         </div>
 
         <!-- Timestamped comments -->
