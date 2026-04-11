@@ -667,6 +667,7 @@ const fadeOutVal        = document.getElementById("editor-fade-out-val");
 const volumeVal         = document.getElementById("editor-volume-val");
 const previewBtn        = document.getElementById("editor-preview-btn");
 const resetBtn          = document.getElementById("editor-reset-btn");
+const saveNewBtn        = document.getElementById("editor-save-new-btn");
 const applyBtn          = document.getElementById("editor-apply-btn");
 
 let editorBuffer   = null;  // decoded AudioBuffer
@@ -1062,6 +1063,43 @@ function stopEditorPreview() {
   previewBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg> Preview`;
   editorPlayhead.style.display = "none";
 }
+
+// Save as New: encode to WAV, upload as a new track
+saveNewBtn.addEventListener("click", async () => {
+  const processed = processAudio();
+  if (!processed) { showToast("Nothing to save.", "error"); return; }
+
+  saveNewBtn.disabled = true;
+  saveNewBtn.textContent = "Processing…";
+
+  try {
+    const wavBlob = encodeWAV(processed);
+    const baseName = savedName.replace(/\.[^.]+$/, "");
+    const file = new File([wavBlob], `${baseName} (edited).wav`, { type: "audio/wav" });
+    const form = new FormData();
+    form.append("file", file);
+
+    saveNewBtn.textContent = "Uploading…";
+
+    const res = await fetch(`${BASE}/api/upload`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Upload failed");
+    }
+
+    const { key } = await res.json();
+    showToast("Saved as new track!", "success");
+    setTimeout(() => { window.location.href = `${BASE}/track.html?file=${encodeURIComponent(key)}`; }, 1000);
+  } catch (err) {
+    showToast(err.message || "Failed to save new track.", "error");
+  } finally {
+    saveNewBtn.disabled = false;
+    saveNewBtn.textContent = "Save as New";
+  }
+});
 
 // Apply & Save: encode to WAV, upload as replacement
 applyBtn.addEventListener("click", async () => {

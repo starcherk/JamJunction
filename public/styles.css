@@ -1182,6 +1182,15 @@ body {
   height: 14px;
 }
 
+.btn-editor-save-new {
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+.btn-editor-save-new:hover {
+  background: rgba(124, 58, 237, 0.15);
+  color: #c4b5fd;
+}
+
 .btn-editor-apply {
   background: var(--accent);
   border-color: var(--accent);
