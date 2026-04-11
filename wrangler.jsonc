@@ -43,6 +43,7 @@
 		"staging": {
 			"name": "jamjunction-staging",
 			"workers_dev": true,
+			"routes": [],
 			"kv_namespaces": [
 				{
 					"binding": "JAMJUNCTION_AUTH",

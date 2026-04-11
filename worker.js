@@ -837,9 +837,7 @@ export default {
     // ── Track detail page ──────────────────────────────────────────────────
     if (path.startsWith("/track/")) {
       const assetUrl = new URL(request.url);
-      assetUrl.pathname = url.pathname.startsWith("/JamJunction")
-        ? "/JamJunction/track.html"
-        : "/track.html";
+      assetUrl.pathname = "/track.html";
       return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
     }
 
