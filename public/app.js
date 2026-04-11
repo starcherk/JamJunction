@@ -373,3 +373,196 @@ dropZone.addEventListener("drop", (e) => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 loadFiles();
+
+// ─── Mic Recording ────────────────────────────────────────────────────────────
+
+const recordTriggerBtn = document.getElementById("record-trigger-btn");
+const recordPanel      = document.getElementById("record-panel");
+const recordCancelBtn  = document.getElementById("record-cancel-btn");
+const recordStartBtn   = document.getElementById("record-start-btn");
+const recordStopBtn    = document.getElementById("record-stop-btn");
+const recordTimer      = document.getElementById("record-timer");
+const recordCanvas     = document.getElementById("record-level-canvas");
+const recordPreview    = document.getElementById("record-preview");
+const recordPreviewAudio = document.getElementById("record-preview-audio");
+const recordNameInput  = document.getElementById("record-name-input");
+const recordUploadBtn  = document.getElementById("record-upload-btn");
+const recordDiscardBtn = document.getElementById("record-discard-btn");
+const recordCanvasCtx  = recordCanvas.getContext("2d");
+
+let recStream      = null;
+let recorder       = null;
+let recChunks      = [];
+let recStartTime   = 0;
+let recTimerInterval = null;
+let recAnimId      = null;
+let recAnalyser    = null;
+let recAudioCtx    = null;
+let recordedBlob   = null;
+
+function formatRecTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function resizeRecCanvas() {
+  const rect = recordCanvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  recordCanvas.width  = rect.width * window.devicePixelRatio;
+  recordCanvas.height = rect.height * window.devicePixelRatio;
+  recordCanvasCtx.setTransform(1, 0, 0, 1, 0, 0);
+  recordCanvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+function drawRecLevel() {
+  const w = recordCanvas.getBoundingClientRect().width;
+  const h = recordCanvas.getBoundingClientRect().height;
+  recordCanvasCtx.clearRect(0, 0, w, h);
+
+  if (!recAnalyser) { recAnimId = requestAnimationFrame(drawRecLevel); return; }
+
+  const data = new Uint8Array(recAnalyser.frequencyBinCount);
+  recAnalyser.getByteFrequencyData(data);
+
+  const barCount = 48;
+  const gap = 3;
+  const barW = (w - gap * (barCount - 1)) / barCount;
+
+  for (let i = 0; i < barCount; i++) {
+    const val = (data[i] || 0) / 255;
+    const barH = Math.max(2, val * h);
+    const x = i * (barW + gap);
+    const y = h - barH;
+
+    const grad = recordCanvasCtx.createLinearGradient(x, y, x, h);
+    grad.addColorStop(0, "#ef4444");
+    grad.addColorStop(1, "#dc2626");
+    recordCanvasCtx.fillStyle = grad;
+    recordCanvasCtx.beginPath();
+    recordCanvasCtx.roundRect(x, y, barW, barH, 2);
+    recordCanvasCtx.fill();
+  }
+
+  recAnimId = requestAnimationFrame(drawRecLevel);
+}
+
+recordTriggerBtn.addEventListener("click", async () => {
+  recordPanel.classList.remove("hidden");
+  recordTriggerBtn.classList.add("hidden");
+  resetRecordUI();
+});
+
+recordCancelBtn.addEventListener("click", () => {
+  stopRecording(true);
+  recordPanel.classList.add("hidden");
+  recordTriggerBtn.classList.remove("hidden");
+});
+
+recordStartBtn.addEventListener("click", async () => {
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    showToast("Microphone access denied.", "error");
+    return;
+  }
+
+  // Set up analyser for live levels
+  recAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = recAudioCtx.createMediaStreamSource(recStream);
+  recAnalyser = recAudioCtx.createAnalyser();
+  recAnalyser.fftSize = 256;
+  source.connect(recAnalyser);
+
+  recChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ? "audio/webm;codecs=opus"
+    : "audio/webm";
+  recorder = new MediaRecorder(recStream, { mimeType });
+  recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunks.push(e.data); };
+  recorder.onstop = () => onRecordingDone();
+
+  recorder.start(100);
+  recStartTime = Date.now();
+  recTimerInterval = setInterval(() => {
+    recordTimer.textContent = formatRecTime(Date.now() - recStartTime);
+  }, 250);
+
+  recordStartBtn.classList.add("hidden");
+  recordStopBtn.classList.remove("hidden");
+  resizeRecCanvas();
+  recAnimId = requestAnimationFrame(drawRecLevel);
+});
+
+recordStopBtn.addEventListener("click", () => {
+  if (recorder?.state === "recording") recorder.stop();
+});
+
+function stopRecording(discard) {
+  if (recorder?.state === "recording") recorder.stop();
+  clearInterval(recTimerInterval);
+  cancelAnimationFrame(recAnimId);
+  recAnimId = null;
+  if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  if (recAudioCtx) { recAudioCtx.close().catch(() => {}); recAudioCtx = null; recAnalyser = null; }
+  if (discard) {
+    recordedBlob = null;
+    recordPreview.classList.add("hidden");
+    if (recordPreviewAudio.src) { URL.revokeObjectURL(recordPreviewAudio.src); recordPreviewAudio.src = ""; }
+  }
+}
+
+function resetRecordUI() {
+  recordStartBtn.classList.remove("hidden");
+  recordStopBtn.classList.add("hidden");
+  recordPreview.classList.add("hidden");
+  recordTimer.textContent = "0:00";
+  recordNameInput.value = "";
+  recordedBlob = null;
+  const ctx = recordCanvasCtx;
+  const rect = recordCanvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, rect.width, rect.height);
+}
+
+function onRecordingDone() {
+  stopRecording(false);
+  if (!recChunks.length) return;
+
+  recordedBlob = new Blob(recChunks, { type: recChunks[0].type || "audio/webm" });
+  const url = URL.createObjectURL(recordedBlob);
+  recordPreviewAudio.src = url;
+  recordPreview.classList.remove("hidden");
+  recordStopBtn.classList.add("hidden");
+
+  const now = new Date();
+  const defaultName = `Recording ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+  recordNameInput.value = defaultName;
+}
+
+recordUploadBtn.addEventListener("click", async () => {
+  if (!recordedBlob) return;
+
+  const name = (recordNameInput.value.trim() || "Recording") + ".webm";
+  const file = new File([recordedBlob], name, { type: recordedBlob.type });
+
+  recordUploadBtn.disabled = true;
+  recordUploadBtn.textContent = "Uploading…";
+
+  const ok = await uploadFile(file);
+
+  recordUploadBtn.disabled = false;
+  recordUploadBtn.textContent = "Upload";
+
+  if (ok) {
+    recordPanel.classList.add("hidden");
+    recordTriggerBtn.classList.remove("hidden");
+    resetRecordUI();
+  }
+});
+
+recordDiscardBtn.addEventListener("click", () => {
+  if (recordPreviewAudio.src) URL.revokeObjectURL(recordPreviewAudio.src);
+  recordPreviewAudio.src = "";
+  recordedBlob = null;
+  resetRecordUI();
+});

@@ -30,29 +30,68 @@
       <section class="section" id="upload-section">
         <h2 class="section-title">Share a Track</h2>
 
-        <div
-          id="drop-zone"
-          class="drop-zone"
-          role="button"
-          tabindex="0"
-          aria-label="Drop audio file or click to browse"
-        >
-          <div class="drop-zone-inner" id="drop-zone-idle">
-            <svg class="drop-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
-              <path d="M24 32V16M24 16L17 23M24 16L31 23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M8 36a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-            </svg>
-            <p class="drop-text-primary">Drop your track here</p>
-            <p class="drop-text-secondary">or <span class="link-style">click to browse</span></p>
-            <p class="drop-formats">MP3 · WAV · FLAC · OGG · AAC · M4A &nbsp;·&nbsp; max 500 MB</p>
+        <div class="share-options">
+          <div
+            id="drop-zone"
+            class="drop-zone"
+            role="button"
+            tabindex="0"
+            aria-label="Drop audio file or click to browse"
+          >
+            <div class="drop-zone-inner" id="drop-zone-idle">
+              <svg class="drop-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                <path d="M24 32V16M24 16L17 23M24 16L31 23" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 36a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+              <p class="drop-text-primary">Drop your track here</p>
+              <p class="drop-text-secondary">or <span class="link-style">click to browse</span></p>
+              <p class="drop-formats">MP3 · WAV · FLAC · OGG · AAC · M4A &nbsp;·&nbsp; max 500 MB</p>
+            </div>
+            <input
+              type="file"
+              id="file-input"
+              accept="audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a"
+              class="visually-hidden"
+              aria-hidden="true"
+            />
           </div>
-          <input
-            type="file"
-            id="file-input"
-            accept="audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a"
-            class="visually-hidden"
-            aria-hidden="true"
-          />
+
+          <div class="share-divider"><span>or</span></div>
+
+          <button class="record-trigger-btn" id="record-trigger-btn" aria-label="Record from microphone">
+            <svg class="record-trigger-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4Z" fill="currentColor"/>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 19v4M8 23h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="record-trigger-label">Record from Mic</span>
+          </button>
+        </div>
+
+        <!-- Recording panel (hidden until mic button clicked) -->
+        <div id="record-panel" class="record-panel hidden">
+          <div class="record-panel-header">
+            <span class="record-panel-title">Recording</span>
+            <button class="record-cancel-btn" id="record-cancel-btn" aria-label="Cancel recording">&times;</button>
+          </div>
+          <canvas id="record-level-canvas" class="record-level-canvas" aria-hidden="true"></canvas>
+          <div class="record-timer" id="record-timer">0:00</div>
+          <div class="record-controls">
+            <button class="record-btn record-btn-start" id="record-start-btn">
+              <span class="record-dot"></span> Record
+            </button>
+            <button class="record-btn record-btn-stop hidden" id="record-stop-btn">
+              <span class="record-stop-icon"></span> Stop
+            </button>
+          </div>
+          <!-- Post-recording preview -->
+          <div class="record-preview hidden" id="record-preview">
+            <audio id="record-preview-audio" controls class="record-preview-audio"></audio>
+            <div class="record-preview-actions">
+              <input type="text" id="record-name-input" class="record-name-input" placeholder="Recording name…" aria-label="Recording name" />
+              <button class="record-btn record-btn-upload" id="record-upload-btn">Upload</button>
+              <button class="record-btn record-btn-discard" id="record-discard-btn">Discard</button>
+            </div>
+          </div>
         </div>
 
         <!-- Progress bar (hidden until upload starts) -->

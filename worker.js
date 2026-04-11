@@ -19,6 +19,7 @@ const ALLOWED_AUDIO_TYPES = new Set([
   "audio/aac",
   "audio/x-m4a",
   "audio/mp4",
+  "audio/webm",
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -42,6 +43,11 @@ function normalizePath(pathname) {
     return pathname.slice("/JamJunction".length) || "/";
   }
   return pathname;
+}
+
+function isAllowedAudio(type) {
+  const base = (type || "").split(";")[0].trim().toLowerCase();
+  return ALLOWED_AUDIO_TYPES.has(base);
 }
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
@@ -673,6 +679,8 @@ export default {
               contentType:
                 head?.httpMetadata?.contentType ?? "audio/mpeg",
               uploadedBy: head?.customMetadata?.uploadedBy ?? "unknown",
+              description: head?.customMetadata?.description ?? "",
+              tags: head?.customMetadata?.tags ? head.customMetadata.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
             };
           })
         );
@@ -686,13 +694,20 @@ export default {
     }
 
     // ── GET /api/files/:key (single track metadata) ─────────────────────────
-    if (path.startsWith("/api/files/") && request.method === "GET") {
+    if (path.startsWith("/api/files/") && !path.includes("/comments") && !path.includes("/reactions") && !path.includes("/activity") && !path.includes("/replace") && request.method === "GET") {
       const key = decodeURIComponent(path.slice("/api/files/".length));
       if (!key) return jsonRes({ error: "No key provided" }, 400);
 
       try {
         const head = await env.JAMJUNCTION_BUCKET.head(key);
         if (!head) return jsonRes({ error: "Track not found" }, 404);
+
+        // Fetch comments, reactions, activity in parallel
+        const [comments, reactions, activity] = await Promise.all([
+          env.JAMJUNCTION_AUTH.get(`comments:${key}`, "json").then(v => v || []),
+          env.JAMJUNCTION_AUTH.get(`reactions:${key}`, "json").then(v => v || {}),
+          env.JAMJUNCTION_AUTH.get(`activity:${key}`, "json").then(v => v || []),
+        ]);
 
         return jsonRes({
           key,
@@ -701,14 +716,19 @@ export default {
           uploaded: head.uploaded,
           contentType: head.httpMetadata?.contentType ?? "audio/mpeg",
           uploadedBy: head.customMetadata?.uploadedBy ?? "unknown",
+          description: head.customMetadata?.description ?? "",
+          tags: head.customMetadata?.tags ? head.customMetadata.tags.split(",").map(t => t.trim()).filter(Boolean) : [],
+          comments,
+          reactions,
+          activity,
         });
       } catch {
         return jsonRes({ error: "Failed to load track" }, 500);
       }
     }
 
-    // ── PATCH /api/files/:key (rename track) ─────────────────────────────────
-    if (path.startsWith("/api/files/") && request.method === "PATCH") {
+    // ── PATCH /api/files/:key (update track metadata) ────────────────────────
+    if (path.startsWith("/api/files/") && !path.includes("/comments") && !path.includes("/reactions") && !path.includes("/activity") && !path.includes("/replace") && request.method === "PATCH") {
       const key = decodeURIComponent(path.slice("/api/files/".length));
       if (!key) return jsonRes({ error: "No key provided" }, 400);
 
@@ -717,24 +737,195 @@ export default {
         return jsonRes({ error: "Invalid JSON" }, 400);
       }
 
-      const newName = typeof body.name === "string" ? body.name.trim() : "";
-      if (!newName) return jsonRes({ error: "Name is required" }, 400);
-
       try {
         const head = await env.JAMJUNCTION_BUCKET.head(key);
         if (!head) return jsonRes({ error: "Track not found" }, 404);
+
+        const meta = { ...head.customMetadata };
+        const activityEntries = [];
+
+        if (typeof body.name === "string" && body.name.trim()) {
+          const oldName = meta.originalName || key;
+          meta.originalName = body.name.trim();
+          if (oldName !== meta.originalName) {
+            activityEntries.push({ type: "rename", from: oldName, to: meta.originalName });
+          }
+        }
+        if (typeof body.description === "string") {
+          meta.description = body.description.slice(0, 500);
+          activityEntries.push({ type: "description" });
+        }
+        if (Array.isArray(body.tags)) {
+          meta.tags = body.tags.map(t => String(t).trim().slice(0, 30)).filter(Boolean).slice(0, 10).join(",");
+          activityEntries.push({ type: "tags" });
+        }
 
         // R2 doesn't support metadata-only updates, so copy the object in place
         const obj = await env.JAMJUNCTION_BUCKET.get(key);
         await env.JAMJUNCTION_BUCKET.put(key, obj.body, {
           httpMetadata: head.httpMetadata,
-          customMetadata: { ...head.customMetadata, originalName: newName },
+          customMetadata: meta,
         });
+
+        // Log activity
+        if (activityEntries.length > 0) {
+          const existing = await env.JAMJUNCTION_AUTH.get(`activity:${key}`, "json") || [];
+          for (const entry of activityEntries) {
+            existing.unshift({
+              ...entry,
+              user: session.name || session.email,
+              email: session.email,
+              timestamp: Date.now(),
+            });
+          }
+          // Keep last 100 entries
+          await env.JAMJUNCTION_AUTH.put(`activity:${key}`, JSON.stringify(existing.slice(0, 100)));
+        }
 
         return jsonRes({ ok: true });
       } catch {
-        return jsonRes({ error: "Rename failed" }, 500);
+        return jsonRes({ error: "Update failed" }, 500);
       }
+    }
+
+    // ── POST /api/files/:key/comments (add timestamped comment) ──────────────
+    if (path.match(/^\/api\/files\/[^/]+\/comments$/) && request.method === "POST") {
+      const key = decodeURIComponent(path.slice("/api/files/".length, path.lastIndexOf("/comments")));
+      if (!key) return jsonRes({ error: "No key provided" }, 400);
+
+      let body;
+      try { body = await request.json(); } catch {
+        return jsonRes({ error: "Invalid JSON" }, 400);
+      }
+
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 500) : "";
+      if (!text) return jsonRes({ error: "Comment text required" }, 400);
+
+      const audioTime = typeof body.audioTime === "number" && body.audioTime >= 0 ? body.audioTime : null;
+
+      const comment = {
+        id: crypto.randomUUID(),
+        email: session.email,
+        name: session.name || session.email,
+        text,
+        audioTime,
+        createdAt: Date.now(),
+      };
+
+      const comments = await env.JAMJUNCTION_AUTH.get(`comments:${key}`, "json") || [];
+      comments.push(comment);
+      await env.JAMJUNCTION_AUTH.put(`comments:${key}`, JSON.stringify(comments));
+
+      // Log activity
+      const activity = await env.JAMJUNCTION_AUTH.get(`activity:${key}`, "json") || [];
+      activity.unshift({
+        type: "comment",
+        user: session.name || session.email,
+        email: session.email,
+        timestamp: Date.now(),
+        preview: text.slice(0, 80),
+      });
+      await env.JAMJUNCTION_AUTH.put(`activity:${key}`, JSON.stringify(activity.slice(0, 100)));
+
+      return jsonRes(comment, 201);
+    }
+
+    // ── DELETE /api/files/:key/comments/:id (delete own comment) ─────────────
+    if (path.match(/^\/api\/files\/[^/]+\/comments\/[^/]+$/) && request.method === "DELETE") {
+      const parts = path.split("/");
+      const commentId = decodeURIComponent(parts.pop());
+      parts.pop(); // "comments"
+      const key = decodeURIComponent(parts.slice(3).join("/"));
+
+      const comments = await env.JAMJUNCTION_AUTH.get(`comments:${key}`, "json") || [];
+      const idx = comments.findIndex(c => c.id === commentId);
+      if (idx === -1) return jsonRes({ error: "Comment not found" }, 404);
+      if (comments[idx].email !== session.email) return jsonRes({ error: "Not your comment" }, 403);
+
+      comments.splice(idx, 1);
+      await env.JAMJUNCTION_AUTH.put(`comments:${key}`, JSON.stringify(comments));
+      return jsonRes({ ok: true });
+    }
+
+    // ── POST /api/files/:key/reactions (toggle reaction) ─────────────────────
+    if (path.match(/^\/api\/files\/[^/]+\/reactions$/) && request.method === "POST") {
+      const key = decodeURIComponent(path.slice("/api/files/".length, path.lastIndexOf("/reactions")));
+
+      let body;
+      try { body = await request.json(); } catch {
+        return jsonRes({ error: "Invalid JSON" }, 400);
+      }
+
+      const ALLOWED_REACTIONS = ["🔥", "👍", "🎵", "💜", "🎧", "🔧"];
+      const emoji = body.emoji;
+      if (!ALLOWED_REACTIONS.includes(emoji)) return jsonRes({ error: "Invalid reaction" }, 400);
+
+      const reactions = await env.JAMJUNCTION_AUTH.get(`reactions:${key}`, "json") || {};
+      if (!reactions[emoji]) reactions[emoji] = [];
+
+      const existing = reactions[emoji].findIndex(r => r.email === session.email);
+      if (existing >= 0) {
+        reactions[emoji].splice(existing, 1);
+        if (reactions[emoji].length === 0) delete reactions[emoji];
+      } else {
+        reactions[emoji].push({ email: session.email, name: session.name || session.email });
+      }
+
+      await env.JAMJUNCTION_AUTH.put(`reactions:${key}`, JSON.stringify(reactions));
+      return jsonRes({ reactions });
+    }
+
+    // ── POST /api/files/:key/replace (replace audio file) ────────────────────
+    if (path.match(/^\/api\/files\/[^/]+\/replace$/) && request.method === "POST") {
+      const key = decodeURIComponent(path.slice("/api/files/".length, path.lastIndexOf("/replace")));
+
+      const head = await env.JAMJUNCTION_BUCKET.head(key);
+      if (!head) return jsonRes({ error: "Track not found" }, 404);
+
+      let formData;
+      try { formData = await request.formData(); } catch {
+        return jsonRes({ error: "Invalid multipart form data" }, 400);
+      }
+
+      const file = formData.get("file");
+      if (!file || !(file instanceof File)) return jsonRes({ error: "No file provided" }, 400);
+      if (!isAllowedAudio(file.type)) return jsonRes({ error: "Only audio files allowed" }, 415);
+      if (file.size > MAX_UPLOAD_BYTES) return jsonRes({ error: "File exceeds 500 MB limit" }, 413);
+
+      try {
+        const oldMeta = { ...head.customMetadata };
+        await env.JAMJUNCTION_BUCKET.put(key, file.stream(), {
+          httpMetadata: { contentType: file.type },
+          customMetadata: {
+            ...oldMeta,
+            replacedBy: session.name || session.email,
+            replacedAt: new Date().toISOString(),
+          },
+        });
+
+        // Log activity
+        const activity = await env.JAMJUNCTION_AUTH.get(`activity:${key}`, "json") || [];
+        activity.unshift({
+          type: "replace",
+          user: session.name || session.email,
+          email: session.email,
+          timestamp: Date.now(),
+          newSize: file.size,
+          newType: file.type,
+        });
+        await env.JAMJUNCTION_AUTH.put(`activity:${key}`, JSON.stringify(activity.slice(0, 100)));
+
+        return jsonRes({ ok: true });
+      } catch {
+        return jsonRes({ error: "Replace failed" }, 500);
+      }
+    }
+
+    // ── GET /api/files/:key/activity (get activity feed) ─────────────────────
+    if (path.match(/^\/api\/files\/[^/]+\/activity$/) && request.method === "GET") {
+      const key = decodeURIComponent(path.slice("/api/files/".length, path.lastIndexOf("/activity")));
+      const activity = await env.JAMJUNCTION_AUTH.get(`activity:${key}`, "json") || [];
+      return jsonRes({ activity });
     }
 
     // ── POST /api/upload  ────────────────────────────────────────────────────
@@ -751,9 +942,9 @@ export default {
         return jsonRes({ error: "No file provided" }, 400);
       }
 
-      if (!ALLOWED_AUDIO_TYPES.has(file.type)) {
+      if (!isAllowedAudio(file.type)) {
         return jsonRes(
-          { error: "Only audio files are allowed (MP3, WAV, FLAC, OGG, AAC, M4A)" },
+          { error: "Only audio files are allowed (MP3, WAV, FLAC, OGG, AAC, M4A, WebM)" },
           415
         );
       }
@@ -822,12 +1013,17 @@ export default {
     }
 
     // ── DELETE /api/files/:key  ──────────────────────────────────────────────
-    if (path.startsWith("/api/files/") && request.method === "DELETE") {
+    if (path.startsWith("/api/files/") && !path.includes("/comments") && !path.includes("/reactions") && !path.includes("/activity") && !path.includes("/replace") && request.method === "DELETE") {
       const key = decodeURIComponent(path.slice("/api/files/".length));
       if (!key) return jsonRes({ error: "No key provided" }, 400);
 
       try {
-        await env.JAMJUNCTION_BUCKET.delete(key);
+        await Promise.all([
+          env.JAMJUNCTION_BUCKET.delete(key),
+          env.JAMJUNCTION_AUTH.delete(`comments:${key}`),
+          env.JAMJUNCTION_AUTH.delete(`reactions:${key}`),
+          env.JAMJUNCTION_AUTH.delete(`activity:${key}`),
+        ]);
         return jsonRes({ ok: true });
       } catch {
         return jsonRes({ error: "Delete failed" }, 500);
