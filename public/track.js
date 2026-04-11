@@ -804,8 +804,11 @@ recordStartBtn.addEventListener("click", async () => {
   source.connect(recAnalyser);
 
   recChunks = [];
-  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-    ? "audio/webm;codecs=opus" : "audio/webm";
+  const mimeType = MediaRecorder.isTypeSupported("audio/mp4")
+    ? "audio/mp4"
+    : MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
   recorder = new MediaRecorder(recStream, { mimeType });
   recorder.ondataavailable = (e) => { if (e.data.size > 0) recChunks.push(e.data); };
   recorder.onstop = () => onRecordingDone();
@@ -830,7 +833,8 @@ recordUploadBtn.addEventListener("click", async () => {
   if (!recordedBlob) return;
   if (!confirm("Replace the current audio with this recording?")) return;
 
-  const file = new File([recordedBlob], "recording.webm", { type: recordedBlob.type });
+  const ext = recordedBlob.type.includes("mp4") ? ".m4a" : ".webm";
+  const file = new File([recordedBlob], "recording" + ext, { type: recordedBlob.type });
   const form = new FormData();
   form.append("file", file);
 

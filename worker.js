@@ -993,7 +993,8 @@ export default {
         headers.set("ETag", object.httpEtag);
         headers.set("Accept-Ranges", "bytes");
         headers.set("Cache-Control", "private, max-age=3600");
-        headers.set("Access-Control-Allow-Origin", new URL(request.url).origin);
+        headers.set("Access-Control-Allow-Origin", "*");
+        headers.set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges");
 
         if (object.range) {
           const r = object.range;
