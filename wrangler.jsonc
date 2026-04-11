@@ -3,7 +3,6 @@
 	"name": "jamjunction",
 	"main": "worker.js",
 	"compatibility_date": "2026-04-09",
-	"workers_dev": true,
 	"assets": {
 		"directory": "./public",
 		"not_found_handling": "single-page-application",
@@ -11,6 +10,15 @@
 		"run_worker_first": true,
 		"binding": "ASSETS"
 	},
+
+	// ── Top-level = Production ──
+	// Deploys to the "jamjunction" Worker via `npm run deploy:prod`
+	"routes": [
+		{
+			"pattern": "kylestarcher.com/JamJunction*",
+			"zone_id": "87732050809c9ad8c87df515a4635b49"
+		}
+	],
 	"r2_buckets": [
 		{
 			"binding": "JAMJUNCTION_BUCKET",
@@ -30,36 +38,8 @@
 		}
 	],
 
-	// ── Production: deployed by GitHub Actions on push to main ──
+	// ── Staging: deployed locally with `npm run deploy` ──
 	"env": {
-		"production": {
-			"routes": [
-				{
-					"pattern": "kylestarcher.com/JamJunction*",
-					"zone_id": "87732050809c9ad8c87df515a4635b49"
-				}
-			],
-			"kv_namespaces": [
-				{
-					"binding": "JAMJUNCTION_AUTH",
-					"id": "2c1058b3e1cc47218fd43abb14ead693"
-				}
-			],
-			"r2_buckets": [
-				{
-					"binding": "JAMJUNCTION_BUCKET",
-					"bucket_name": "jamjunction-files",
-					"preview_bucket_name": "jamjunction-files-preview"
-				}
-			],
-			"send_email": [
-				{
-					"name": "SEND_EMAIL"
-				}
-			]
-		},
-
-		// ── Staging: deployed locally with `npm run deploy` ──
 		"staging": {
 			"name": "jamjunction-staging",
 			"workers_dev": true,
