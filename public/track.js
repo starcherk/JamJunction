@@ -781,6 +781,10 @@ function updateEditorUI() {
   trimLeftOverlay.style.width  = `${trimStart * 100}%`;
   trimRightOverlay.style.width = `${(1 - trimEnd) * 100}%`;
 
+  // Keep handles aligned with trim positions
+  handleLeft.style.left   = `${trimStart * 100}%`;
+  handleRight.style.right = `${(1 - trimEnd) * 100}%`;
+
   // Fade overlays (relative to visible region)
   const fadeIn = parseFloat(fadeInSlider.value);
   const fadeOut = parseFloat(fadeOutSlider.value);
