@@ -30,10 +30,7 @@ const deleteBtn       = document.getElementById("delete-btn");
 const backLink        = document.getElementById("back-link");
 const toast           = document.getElementById("toast");
 
-const descInput       = document.getElementById("description-input");
-const saveDescBtn     = document.getElementById("save-desc-btn");
-const tagsList        = document.getElementById("tags-list");
-const tagInput        = document.getElementById("tag-input");
+
 
 
 
@@ -59,8 +56,6 @@ const vizCtx           = visualizerCanvas.getContext("2d");
 
 let track       = null;
 let savedName   = "";
-let savedDesc   = "";
-let currentTags = [];
 let toastTimer  = null;
 let commentAudioTime = null;
 let commentAudioEndTime = null;
@@ -259,14 +254,6 @@ async function loadTrack(retries = 2) {
       <span>by ${escapeHtml(track.uploadedBy)}</span>
     `;
 
-    // Description
-    savedDesc = track.description || "";
-    descInput.value = savedDesc;
-
-    // Tags
-    currentTags = track.tags || [];
-    renderTags();
-
     // Audio
     audioPlayer.src = `${BASE}/api/download/${encodeURIComponent(track.key)}`;
     downloadLink.href = `${BASE}/api/download/${encodeURIComponent(track.key)}`;
@@ -286,6 +273,9 @@ async function loadTrack(retries = 2) {
     trackLoading.classList.add("hidden");
     trackDetail.classList.remove("hidden");
     startIdleLoop();
+
+    // Auto-load editor
+    loadEditor();
   } catch (err) {
     trackLoading.innerHTML = `<p style="color:var(--error)">Track not found.</p>`;
   }
@@ -327,78 +317,6 @@ saveNameBtn.addEventListener("click", async () => {
     saveNameBtn.textContent = "Save";
   }
 });
-
-// ─── Description ──────────────────────────────────────────────────────────────
-
-descInput.addEventListener("input", () => {
-  const changed = descInput.value !== savedDesc;
-  saveDescBtn.classList.toggle("hidden", !changed);
-});
-
-saveDescBtn.addEventListener("click", async () => {
-  saveDescBtn.disabled = true;
-  saveDescBtn.textContent = "Saving…";
-
-  try {
-    const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description: descInput.value }),
-    });
-    if (!res.ok) throw new Error();
-
-    savedDesc = descInput.value;
-    saveDescBtn.classList.add("hidden");
-    showToast("Notes saved.", "success");
-  } catch {
-    showToast("Failed to save notes.", "error");
-  } finally {
-    saveDescBtn.disabled = false;
-    saveDescBtn.textContent = "Save Notes";
-  }
-});
-
-// ─── Tags ─────────────────────────────────────────────────────────────────────
-
-function renderTags() {
-  tagsList.innerHTML = "";
-  for (const tag of currentTags) {
-    const chip = document.createElement("span");
-    chip.className = "tag-chip";
-    chip.innerHTML = `${escapeHtml(tag)} <button class="tag-remove" aria-label="Remove tag ${escapeHtml(tag)}">&times;</button>`;
-    chip.querySelector(".tag-remove").addEventListener("click", () => removeTag(tag));
-    tagsList.appendChild(chip);
-  }
-}
-
-tagInput.addEventListener("keydown", (e) => {
-  if (e.key !== "Enter" && e.key !== ",") return;
-  e.preventDefault();
-  const val = tagInput.value.replace(/,/g, "").trim();
-  if (!val || currentTags.includes(val) || currentTags.length >= 10) return;
-  tagInput.value = "";
-  currentTags.push(val);
-  renderTags();
-  saveTags();
-});
-
-async function removeTag(tag) {
-  currentTags = currentTags.filter(t => t !== tag);
-  renderTags();
-  saveTags();
-}
-
-async function saveTags() {
-  try {
-    await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tags: currentTags }),
-    });
-  } catch {
-    showToast("Failed to save tags.", "error");
-  }
-}
 
 // ─── Timestamped Comments ─────────────────────────────────────────────────────
 
@@ -645,9 +563,7 @@ deleteBtn.addEventListener("click", async () => {
 
 // ─── Audio Editor ─────────────────────────────────────────────────────────────
 
-const editBtn           = document.getElementById("edit-btn");
 const editorPanel       = document.getElementById("editor-panel");
-const editorClose       = document.getElementById("editor-close");
 const editorWaveformWrap = document.getElementById("editor-waveform-wrap");
 const editorWaveform    = document.getElementById("editor-waveform");
 const editorCtx         = editorWaveform.getContext("2d");
@@ -683,28 +599,19 @@ let editorPreviewAnim = null;
 let editorPreviewStartTime = 0;
 let isEditorPreviewing = false;
 
-// Open editor
-editBtn.addEventListener("click", async () => {
-  editorPanel.classList.remove("hidden");
-  editorPanel.scrollIntoView({ behavior: "smooth" });
-  editBtn.disabled = true;
-  editBtn.textContent = "Loading audio…";
-
+// Load editor audio
+async function loadEditor() {
   try {
-    // Fetch raw audio bytes
     const res = await fetch(`${BASE}/api/download/${encodeURIComponent(trackKey)}`);
     if (!res.ok) throw new Error();
     const arrayBuf = await res.arrayBuffer();
 
-    // Decode
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     editorBuffer = await ctx.decodeAudioData(arrayBuf);
     ctx.close();
 
-    // Compute peaks
     editorPeaks = computePeaks(editorBuffer, 2000);
 
-    // Reset state
     trimStart = 0;
     trimEnd   = 1;
     fadeInSlider.value  = 0;
@@ -715,18 +622,8 @@ editBtn.addEventListener("click", async () => {
     drawEditorWaveform();
   } catch {
     showToast("Failed to load audio for editing.", "error");
-    editorPanel.classList.add("hidden");
-  } finally {
-    editBtn.disabled = false;
-    editBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M2.695 14.763l-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a4 4 0 0 0 1.343-.885L17.5 5.5a2.121 2.121 0 0 0-3-3L3.58 13.42a4 4 0 0 0-.885 1.343Z"/></svg> Edit Audio`;
   }
-});
-
-// Close editor
-editorClose.addEventListener("click", () => {
-  stopEditorPreview();
-  editorPanel.classList.add("hidden");
-});
+}
 
 // Compute peaks from AudioBuffer
 function computePeaks(buffer, numPeaks) {
