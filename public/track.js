@@ -232,13 +232,19 @@ backLink.href = BASE + "/";
 
 // ─── Load track ───────────────────────────────────────────────────────────────
 
-async function loadTrack() {
+async function loadTrack(retries = 2) {
   try {
     await fetchMe();
 
     const apiUrl = `${BASE}/api/files/${encodeURIComponent(trackKey)}`;
     const res = await fetch(apiUrl);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      if (res.status === 404 && retries > 0) {
+        await new Promise(r => setTimeout(r, 1000));
+        return loadTrack(retries - 1);
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
     track = await res.json();
 
     savedName = track.originalName;
@@ -638,6 +644,7 @@ const volumeVal         = document.getElementById("editor-volume-val");
 const previewBtn        = document.getElementById("editor-preview-btn");
 const resetBtn          = document.getElementById("editor-reset-btn");
 const branchBtn         = document.getElementById("editor-branch-btn");
+const branchInput       = document.getElementById("editor-branch-input");
 
 let editorBuffer   = null;  // decoded AudioBuffer
 let editorPeaks    = null;  // pre-computed peaks for waveform drawing
@@ -874,6 +881,7 @@ resetBtn.addEventListener("click", () => {
   handleLeft.style.left = "0";
   handleRight.style.right = "0";
   editorPlayhead.style.display = "none";
+  branchInput.value = "";
   updateEditorUI();
   drawEditorWaveform();
 });
@@ -1038,13 +1046,20 @@ branchBtn.addEventListener("click", async () => {
   const processed = processAudio();
   if (!processed) { showToast("Nothing to branch.", "error"); return; }
 
+  const branchName = branchInput.value.trim();
+  if (!branchName) {
+    branchInput.focus();
+    showToast("Give your branch a name.", "error");
+    return;
+  }
+
   branchBtn.disabled = true;
   branchBtn.textContent = "Processing…";
 
   try {
     const wavBlob = encodeWAV(processed);
-    const baseName = savedName.replace(/\.[^.]+$/, "");
-    const file = new File([wavBlob], `${baseName} (branch).wav`, { type: "audio/wav" });
+    const fileName = `${branchName}.wav`;
+    const file = new File([wavBlob], fileName, { type: "audio/wav" });
     const form = new FormData();
     form.append("file", file);
     form.append("parentKey", trackKey);
@@ -1062,7 +1077,7 @@ branchBtn.addEventListener("click", async () => {
 
     const { key } = await res.json();
     showToast("Branch created!", "success");
-    setTimeout(() => { window.location.href = `${BASE}/track.html?file=${encodeURIComponent(key)}`; }, 1000);
+    setTimeout(() => { window.location.href = `${BASE}/track/${encodeURIComponent(key)}`; }, 1000);
   } catch (err) {
     showToast(err.message || "Failed to create branch.", "error");
   } finally {
@@ -1094,7 +1109,7 @@ async function renderLineage(parentKey) {
       <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14" class="lineage-icon" aria-hidden="true">
         <path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Z"/>
       </svg>
-      Branched from <a href="${BASE}/track.html?file=${encodeURIComponent(parentKey)}" class="lineage-link">${escapeHtml(parentName)}</a>
+      Branched from <a href="${BASE}/track/${encodeURIComponent(parentKey)}" class="lineage-link">${escapeHtml(parentName)}</a>
     `;
     trackLineage.classList.remove("hidden");
   } catch {

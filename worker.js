@@ -966,7 +966,8 @@ export default {
         };
         if (parentKey) customMeta.parentKey = parentKey;
 
-        await env.JAMJUNCTION_BUCKET.put(key, file.stream(), {
+        const body = await file.arrayBuffer();
+        await env.JAMJUNCTION_BUCKET.put(key, body, {
           httpMetadata: { contentType: file.type },
           customMetadata: customMeta,
         });

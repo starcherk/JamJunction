@@ -1196,6 +1196,30 @@ body {
   height: 14px;
 }
 
+.editor-branch-name {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+}
+
+.editor-branch-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.editor-branch-input:focus {
+  border-color: var(--accent);
+}
+.editor-branch-input::placeholder {
+  color: var(--text-muted);
+}
+
 .btn-editor-reset {
   margin-left: auto;
 }
