@@ -167,9 +167,41 @@ function startIdleLoop() {
 
 window.addEventListener("resize", resizeCanvas);
 
-audioPlayer.addEventListener("play", () => startVisualizer());
-audioPlayer.addEventListener("pause", () => stopVisualizer());
-audioPlayer.addEventListener("ended", () => stopVisualizer());
+audioPlayer.addEventListener("play", () => {
+  startVisualizer();
+  startMainPlayhead();
+});
+audioPlayer.addEventListener("pause", () => {
+  stopVisualizer();
+  stopMainPlayhead();
+});
+audioPlayer.addEventListener("ended", () => {
+  stopVisualizer();
+  stopMainPlayhead();
+});
+
+// Sync editor playhead with main audio player
+let mainPlayheadAnim = null;
+
+function startMainPlayhead() {
+  if (mainPlayheadAnim) return;
+  function tick() {
+    if (audioPlayer.duration && !isEditorPreviewing) {
+      const pct = audioPlayer.currentTime / audioPlayer.duration;
+      editorPlayhead.style.display = "block";
+      editorPlayhead.style.left = `${pct * 100}%`;
+    }
+    mainPlayheadAnim = requestAnimationFrame(tick);
+  }
+  mainPlayheadAnim = requestAnimationFrame(tick);
+}
+
+function stopMainPlayhead() {
+  if (mainPlayheadAnim) {
+    cancelAnimationFrame(mainPlayheadAnim);
+    mainPlayheadAnim = null;
+  }
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 

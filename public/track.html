@@ -61,6 +61,14 @@
         <div class="track-meta-row" id="track-meta"></div>
 
 
+        <!-- Player card -->
+        <div class="player-card" id="player-card">
+          <div class="player-card-timeline" id="player-timeline">
+            <div class="timeline-markers" id="timeline-markers"></div>
+          </div>
+          <audio id="audio-player" controls preload="none" class="player-card-audio" crossorigin="anonymous"></audio>
+        </div>
+
         <!-- Branch lineage -->
         <div id="track-lineage" class="track-lineage hidden"></div>
 
@@ -134,14 +142,6 @@
           </div>
         </div>
 
-        <!-- Player card -->
-        <div class="player-card" id="player-card">
-          <div class="player-card-timeline" id="player-timeline">
-            <div class="timeline-markers" id="timeline-markers"></div>
-          </div>
-          <audio id="audio-player" controls preload="none" class="player-card-audio" crossorigin="anonymous"></audio>
-        </div>
-
         <!-- Actions -->
         <div class="track-actions">
           <a id="download-link" class="btn-action" download>
@@ -190,7 +190,7 @@
             <p class="comment-hint">Click the player timeline or use Stamp to pin a timestamp from the editor.</p>
           </div>
           <ul class="comments-list" id="comments-list"></ul>
-          <p class="comments-empty hidden" id="comments-empty">No comments yet. Be the first!</p>
+          <p class="comments-empty hidden" id="comments-empty">No comments yet.</p>
         </div>
 
         <!-- Activity feed -->
