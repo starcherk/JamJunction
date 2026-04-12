@@ -27,6 +27,8 @@ const uploadStatus   = document.getElementById("upload-status");
 const libraryLoading = document.getElementById("library-loading");
 const libraryEmpty   = document.getElementById("library-empty");
 const fileList       = document.getElementById("file-list");
+const filesSection   = document.getElementById("files-section");
+const filesList      = document.getElementById("files-list");
 const searchInput    = document.getElementById("search-input");
 
 // Backdoor: press Shift+Alt+U to unlock any-file-type upload
@@ -37,8 +39,13 @@ document.addEventListener("keydown", (e) => {
     fileInput.accept = bypassFileType ? "*/*" : "audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a";
     const msg = bypassFileType ? "Any file type unlocked" : "Audio files only";
     alert(msg);
+    renderFiles(allFiles);
   }
 });
+
+function isAudioFile(file) {
+  return (file.contentType || "").startsWith("audio/");
+}
 
 const playerBar       = document.getElementById("player-bar");
 const audioPlayer     = document.getElementById("audio-player");
@@ -102,20 +109,35 @@ async function loadFiles() {
 function renderFiles(files) {
   libraryLoading.classList.add("hidden");
 
-  if (files.length === 0) {
+  const audioFiles = files.filter(f => isAudioFile(f));
+  const otherFiles = files.filter(f => !isAudioFile(f));
+
+  // Audio list
+  if (audioFiles.length === 0 && (!bypassFileType || otherFiles.length === 0)) {
     libraryEmpty.classList.remove("hidden");
     fileList.classList.add("hidden");
-    return;
+  } else if (audioFiles.length === 0) {
+    libraryEmpty.classList.add("hidden");
+    fileList.classList.add("hidden");
+  } else {
+    libraryEmpty.classList.add("hidden");
+    fileList.innerHTML = "";
+    for (const f of audioFiles) {
+      fileList.appendChild(buildFileItem(f));
+    }
+    fileList.classList.remove("hidden");
   }
 
-  libraryEmpty.classList.add("hidden");
-  fileList.innerHTML = "";
-
-  for (const f of files) {
-    fileList.appendChild(buildFileItem(f));
+  // Non-audio list (only visible in bypass mode)
+  if (bypassFileType && otherFiles.length > 0) {
+    filesList.innerHTML = "";
+    for (const f of otherFiles) {
+      filesList.appendChild(buildFileItem(f));
+    }
+    filesSection.classList.remove("hidden");
+  } else {
+    filesSection.classList.add("hidden");
   }
-
-  fileList.classList.remove("hidden");
 }
 
 function buildFileItem(file) {
@@ -144,11 +166,18 @@ function buildFileItem(file) {
   </svg>`;
 
   const isPlaying = file.key === currentKey;
+  const audio = isAudioFile(file);
+
+  // File type icon for non-audio
+  const fileSvg = `<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" style="width:20px;height:20px;opacity:0.5">
+    <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Z" clip-rule="evenodd"/>
+  </svg>`;
 
   li.innerHTML = `
-    <button class="file-play-btn" aria-label="${isPlaying ? "Stop" : "Play"} ${file.originalName}">
-      ${isPlaying ? stopSvg : playSvg}
-    </button>
+    ${audio
+      ? `<button class="file-play-btn" aria-label="${isPlaying ? "Stop" : "Play"} ${file.originalName}">${isPlaying ? stopSvg : playSvg}</button>`
+      : `<div class="file-type-icon">${fileSvg}</div>`
+    }
     <div class="file-info">
       <div class="file-name" title="${escapeHtml(file.originalName)}">${escapeHtml(file.originalName)}</div>
       <div class="file-meta">
@@ -170,10 +199,12 @@ function buildFileItem(file) {
     </div>
   `;
 
-  li.querySelector(".file-play-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    togglePlay(file);
-  });
+  if (audio) {
+    li.querySelector(".file-play-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      togglePlay(file);
+    });
+  }
 
   li.querySelector(".delete-btn").addEventListener("click", (e) => {
     e.stopPropagation();
