@@ -827,9 +827,10 @@ editorWaveformWrap.addEventListener("click", (e) => {
   editorPlayhead.style.display = "block";
   editorPlayhead.style.left = `${pct * 100}%`;
 
-  // Seek main audio
+  // Seek main audio and pause
   if (audioPlayer.duration) {
     audioPlayer.currentTime = pct * audioPlayer.duration;
+    if (!audioPlayer.paused) audioPlayer.pause();
   }
 });
 
