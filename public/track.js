@@ -820,12 +820,17 @@ editorWaveformWrap.addEventListener("click", (e) => {
   if (e.target.closest(".editor-handle")) return;
   const rect = editorWaveformWrap.getBoundingClientRect();
   let pct = (e.clientX - rect.left) / rect.width;
-  pct = Math.max(trimStart, Math.min(trimEnd, pct));
+  pct = Math.max(0, Math.min(1, pct));
   editorClickPct = pct;
 
   // Show a static playhead marker
   editorPlayhead.style.display = "block";
   editorPlayhead.style.left = `${pct * 100}%`;
+
+  // Seek main audio
+  if (audioPlayer.duration) {
+    audioPlayer.currentTime = pct * audioPlayer.duration;
+  }
 });
 
 window.addEventListener("resize", () => {
