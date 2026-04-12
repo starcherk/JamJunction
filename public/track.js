@@ -25,6 +25,10 @@ const trackNameInput  = document.getElementById("track-name-input");
 const saveNameBtn     = document.getElementById("save-name-btn");
 const trackMeta       = document.getElementById("track-meta");
 const audioPlayer     = document.getElementById("audio-player");
+const playPauseBtn    = document.getElementById("play-pause-btn");
+const playIcon        = document.getElementById("play-icon");
+const pauseIcon       = document.getElementById("pause-icon");
+const playerTime      = document.getElementById("player-time");
 const downloadLink    = document.getElementById("download-link");
 const deleteBtn       = document.getElementById("delete-btn");
 const backLink        = document.getElementById("back-link");
@@ -170,14 +174,36 @@ window.addEventListener("resize", resizeCanvas);
 audioPlayer.addEventListener("play", () => {
   startVisualizer();
   startMainPlayhead();
+  playIcon.style.display = "none";
+  pauseIcon.style.display = "";
 });
 audioPlayer.addEventListener("pause", () => {
   stopVisualizer();
   stopMainPlayhead();
+  playIcon.style.display = "";
+  pauseIcon.style.display = "none";
 });
 audioPlayer.addEventListener("ended", () => {
   stopVisualizer();
   stopMainPlayhead();
+  playIcon.style.display = "";
+  pauseIcon.style.display = "none";
+});
+audioPlayer.addEventListener("timeupdate", () => {
+  const cur = formatTime(audioPlayer.currentTime);
+  const dur = formatTime(audioPlayer.duration);
+  playerTime.textContent = `${cur} / ${dur}`;
+});
+audioPlayer.addEventListener("loadedmetadata", () => {
+  playerTime.textContent = `0:00.00 / ${formatTime(audioPlayer.duration)}`;
+});
+
+playPauseBtn.addEventListener("click", () => {
+  if (audioPlayer.paused) {
+    audioPlayer.play();
+  } else {
+    audioPlayer.pause();
+  }
 });
 
 // Sync editor playhead with main audio player

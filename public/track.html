@@ -66,7 +66,14 @@
           <div class="player-card-timeline" id="player-timeline">
             <div class="timeline-markers" id="timeline-markers"></div>
           </div>
-          <audio id="audio-player" controls preload="none" class="player-card-audio" crossorigin="anonymous"></audio>
+          <div class="player-controls">
+            <button class="play-pause-btn" id="play-pause-btn" aria-label="Play">
+              <svg id="play-icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+              <svg id="pause-icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+            </button>
+            <span class="player-time" id="player-time">0:00 / 0:00</span>
+          </div>
+          <audio id="audio-player" preload="none" crossorigin="anonymous"></audio>
         </div>
 
         <!-- Branch lineage -->
