@@ -893,7 +893,8 @@ export default {
 
       const file = formData.get("file");
       if (!file || !(file instanceof File)) return jsonRes({ error: "No file provided" }, 400);
-      if (!isAllowedAudio(file.type)) return jsonRes({ error: "Only audio files allowed" }, 415);
+      const bypassType = url.searchParams.get("bypass") === "anytype";
+      if (!bypassType && !isAllowedAudio(file.type)) return jsonRes({ error: "Only audio files allowed" }, 415);
       if (file.size > MAX_UPLOAD_BYTES) return jsonRes({ error: "File exceeds 500 MB limit" }, 413);
 
       try {
@@ -946,7 +947,8 @@ export default {
         return jsonRes({ error: "No file provided" }, 400);
       }
 
-      if (!isAllowedAudio(file.type)) {
+      const bypassType = url.searchParams.get("bypass") === "anytype";
+      if (!bypassType && !isAllowedAudio(file.type)) {
         return jsonRes(
           { error: "Only audio files are allowed (MP3, WAV, FLAC, OGG, AAC, M4A, WebM)" },
           415

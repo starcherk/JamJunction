@@ -29,6 +29,17 @@ const libraryEmpty   = document.getElementById("library-empty");
 const fileList       = document.getElementById("file-list");
 const searchInput    = document.getElementById("search-input");
 
+// Backdoor: press Shift+Alt+U to unlock any-file-type upload
+let bypassFileType = false;
+document.addEventListener("keydown", (e) => {
+  if (e.shiftKey && e.altKey && e.code === "KeyU") {
+    bypassFileType = !bypassFileType;
+    fileInput.accept = bypassFileType ? "*/*" : "audio/*,.mp3,.wav,.flac,.ogg,.aac,.m4a";
+    const msg = bypassFileType ? "Any file type unlocked" : "Audio files only";
+    alert(msg);
+  }
+});
+
 const playerBar       = document.getElementById("player-bar");
 const audioPlayer     = document.getElementById("audio-player");
 const playerName      = document.getElementById("player-track-name");
@@ -305,7 +316,8 @@ async function uploadFile(file) {
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${BASE}/api/upload`);
+    const uploadUrl = bypassFileType ? `${BASE}/api/upload?bypass=anytype` : `${BASE}/api/upload`;
+    xhr.open("POST", uploadUrl);
 
     xhr.upload.addEventListener("progress", (e) => {
       if (e.lengthComputable) {
