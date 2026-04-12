@@ -2,7 +2,7 @@ import { EmailMessage } from "cloudflare:email";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const MAX_UPLOAD_BYTES = 500 * 1024 * 1024; // 500 MB
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB (Cloudflare Workers body limit)
 const SESSION_MAX_AGE = 30 * 24 * 60 * 60;  // 30 days in seconds
 const SENDER_EMAIL = "noreply@kylestarcher.com";
 const ADMIN_EMAIL = "kylestarcher@rogers.com";

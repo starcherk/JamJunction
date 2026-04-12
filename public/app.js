@@ -23,6 +23,7 @@ const progressBar    = document.getElementById("progress-bar");
 const progressPct    = document.getElementById("progress-pct");
 const progressName   = document.getElementById("progress-filename");
 const uploadStatus   = document.getElementById("upload-status");
+const cancelUploadBtn = document.getElementById("cancel-upload-btn");
 
 const libraryLoading = document.getElementById("library-loading");
 const libraryEmpty   = document.getElementById("library-empty");
@@ -337,16 +338,20 @@ function setUploadStatus(message, type = "") {
   uploadStatus.className   = `upload-status ${type}`.trim();
 }
 
+let currentXhr = null;
+
 async function uploadFile(file) {
   setProgressVisible(true);
   setProgress(0, file.name);
   setUploadStatus("Uploading…");
+  cancelUploadBtn.classList.remove("hidden");
 
   const formData = new FormData();
   formData.append("file", file);
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
+    currentXhr = xhr;
     const uploadUrl = bypassFileType ? `${BASE}/api/upload?bypass=anytype` : `${BASE}/api/upload`;
     xhr.open("POST", uploadUrl);
 
@@ -357,6 +362,8 @@ async function uploadFile(file) {
     });
 
     xhr.addEventListener("load", async () => {
+      currentXhr = null;
+      cancelUploadBtn.classList.add("hidden");
       setProgress(100, null);
 
       let body;
@@ -377,14 +384,29 @@ async function uploadFile(file) {
     });
 
     xhr.addEventListener("error", () => {
+      currentXhr = null;
+      cancelUploadBtn.classList.add("hidden");
       setUploadStatus("Network error. Please try again.", "error");
       showToast("Upload failed: network error.", "error");
+      resolve(false);
+    });
+
+    xhr.addEventListener("abort", () => {
+      currentXhr = null;
+      cancelUploadBtn.classList.add("hidden");
+      setUploadStatus("Upload cancelled.", "info");
+      showToast("Upload cancelled.", "info");
+      setTimeout(() => setProgressVisible(false), 1500);
       resolve(false);
     });
 
     xhr.send(formData);
   });
 }
+
+cancelUploadBtn.addEventListener("click", () => {
+  if (currentXhr) currentXhr.abort();
+});
 
 // ─── Drop zone interactions ───────────────────────────────────────────────────
 

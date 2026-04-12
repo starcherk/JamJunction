@@ -275,6 +275,34 @@ body {
 
 .upload-status.success { color: var(--success); }
 .upload-status.error   { color: var(--error); }
+.upload-status.info    { color: var(--text-muted); }
+
+.progress-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.progress-actions .upload-status {
+  margin-top: 0;
+}
+
+.btn-cancel-upload {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--error);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-cancel-upload:hover {
+  background: var(--surface-3);
+}
 
 /* ── Library header ───────────────────────────────────────────────────────── */
 
