@@ -804,6 +804,7 @@ export default {
       if (!text) return jsonRes({ error: "Comment text required" }, 400);
 
       const audioTime = typeof body.audioTime === "number" && body.audioTime >= 0 ? body.audioTime : null;
+      const audioEndTime = typeof body.audioEndTime === "number" && body.audioEndTime > 0 ? body.audioEndTime : null;
 
       const comment = {
         id: crypto.randomUUID(),
@@ -811,6 +812,7 @@ export default {
         name: session.name || session.email,
         text,
         audioTime,
+        audioEndTime: audioEndTime && audioTime != null && audioEndTime > audioTime ? audioEndTime : null,
         createdAt: Date.now(),
       };
 

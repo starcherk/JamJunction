@@ -946,6 +946,20 @@ body {
   transform: translateX(-50%) scaleY(1.2);
 }
 
+.timeline-marker-region {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--accent-glow);
+  border-left: 2px solid var(--accent-light);
+  border-right: 2px solid var(--accent-light);
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity var(--transition);
+}
+
 /* ── Audio Editor ─────────────────────────────────────────────────────────── */
 
 .editor-panel {
@@ -1307,6 +1321,41 @@ body {
 .comment-input-row {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+}
+
+.comments-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.comments-header-row .section-title {
+  margin-bottom: 0;
+}
+
+.btn-comment-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--accent-light);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.btn-comment-stamp:hover {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+.btn-comment-stamp svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .comment-input {

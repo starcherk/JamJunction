@@ -63,6 +63,7 @@ let savedDesc   = "";
 let currentTags = [];
 let toastTimer  = null;
 let commentAudioTime = null;
+let commentAudioEndTime = null;
 let currentUser = null;
 
 // ─── Fetch current user ───────────────────────────────────────────────────
@@ -192,10 +193,10 @@ function formatDate(iso) {
 }
 
 function formatTime(seconds) {
-  if (seconds == null || isNaN(seconds)) return "0:00";
+  if (seconds == null || isNaN(seconds)) return "0:00.00";
   const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  const s = (seconds % 60).toFixed(2).padStart(5, "0");
+  return `${m}:${s}`;
 }
 
 function timeAgo(ts) {
@@ -407,12 +408,14 @@ playerTimeline.addEventListener("click", (e) => {
   const rect = playerTimeline.getBoundingClientRect();
   const pct = (e.clientX - rect.left) / rect.width;
   commentAudioTime = Math.max(0, pct * audioPlayer.duration);
+  commentAudioEndTime = null;
   commentTimeLabel.textContent = formatTime(commentAudioTime);
   commentTimeBadge.classList.remove("hidden");
 });
 
 commentTimeClear.addEventListener("click", () => {
   commentAudioTime = null;
+  commentAudioEndTime = null;
   commentTimeBadge.classList.add("hidden");
 });
 
@@ -439,7 +442,7 @@ async function submitComment() {
     const res = await fetch(`${BASE}/api/files/${encodeURIComponent(trackKey)}/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, audioTime: commentAudioTime }),
+      body: JSON.stringify({ text, audioTime: commentAudioTime, audioEndTime: commentAudioEndTime }),
     });
     if (!res.ok) throw new Error();
     const comment = await res.json();
@@ -449,6 +452,7 @@ async function submitComment() {
     renderComments(track.comments);
     commentInput.value = "";
     commentAudioTime = null;
+    commentAudioEndTime = null;
     commentTimeBadge.classList.add("hidden");
   } catch {
     showToast("Failed to post comment.", "error");
@@ -474,9 +478,12 @@ function renderComments(comments) {
     const li = document.createElement("li");
     li.className = "comment-item";
 
-    const timeTag = c.audioTime != null
-      ? `<button class="comment-timestamp" data-time="${c.audioTime}">${formatTime(c.audioTime)}</button>`
-      : "";
+    let timeTag = "";
+    if (c.audioTime != null && c.audioEndTime != null) {
+      timeTag = `<button class="comment-timestamp comment-timestamp-range" data-time="${c.audioTime}" data-end="${c.audioEndTime}">${formatTime(c.audioTime)} – ${formatTime(c.audioEndTime)}</button>`;
+    } else if (c.audioTime != null) {
+      timeTag = `<button class="comment-timestamp" data-time="${c.audioTime}">${formatTime(c.audioTime)}</button>`;
+    }
 
     const deleteBtn = currentUser && c.email === currentUser.email
       ? `<button class="comment-delete" data-id="${c.id}" aria-label="Delete comment">&times;</button>`
@@ -519,17 +526,36 @@ function renderComments(comments) {
 function addTimelineMarker(comment) {
   // We'll re-add markers once duration is known
   if (!audioPlayer.duration) return;
-  const pct = (comment.audioTime / audioPlayer.duration) * 100;
-  const marker = document.createElement("div");
-  marker.className = "timeline-marker";
-  marker.style.left = `${pct}%`;
-  marker.title = `${comment.name}: ${comment.text.slice(0, 50)}`;
-  marker.addEventListener("click", (e) => {
-    e.stopPropagation();
-    audioPlayer.currentTime = comment.audioTime;
-    if (audioPlayer.paused) audioPlayer.play().catch(() => {});
-  });
-  timelineMarkers.appendChild(marker);
+
+  if (comment.audioEndTime != null) {
+    // Region marker
+    const startPct = (comment.audioTime / audioPlayer.duration) * 100;
+    const endPct = (comment.audioEndTime / audioPlayer.duration) * 100;
+    const marker = document.createElement("div");
+    marker.className = "timeline-marker-region";
+    marker.style.left = `${startPct}%`;
+    marker.style.width = `${endPct - startPct}%`;
+    marker.title = `${comment.name}: ${comment.text.slice(0, 50)}`;
+    marker.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audioPlayer.currentTime = comment.audioTime;
+      if (audioPlayer.paused) audioPlayer.play().catch(() => {});
+    });
+    timelineMarkers.appendChild(marker);
+  } else {
+    // Point marker
+    const pct = (comment.audioTime / audioPlayer.duration) * 100;
+    const marker = document.createElement("div");
+    marker.className = "timeline-marker";
+    marker.style.left = `${pct}%`;
+    marker.title = `${comment.name}: ${comment.text.slice(0, 50)}`;
+    marker.addEventListener("click", (e) => {
+      e.stopPropagation();
+      audioPlayer.currentTime = comment.audioTime;
+      if (audioPlayer.paused) audioPlayer.play().catch(() => {});
+    });
+    timelineMarkers.appendChild(marker);
+  }
 }
 
 // Re-render markers once we know the duration
@@ -645,6 +671,7 @@ const previewBtn        = document.getElementById("editor-preview-btn");
 const resetBtn          = document.getElementById("editor-reset-btn");
 const branchBtn         = document.getElementById("editor-branch-btn");
 const branchInput       = document.getElementById("editor-branch-input");
+const stampBtn          = document.getElementById("editor-stamp-btn");
 
 let editorBuffer   = null;  // decoded AudioBuffer
 let editorPeaks    = null;  // pre-computed peaks for waveform drawing
@@ -859,11 +886,13 @@ setupHandleDrag(handleLeft, "left");
 setupHandleDrag(handleRight, "right");
 
 // Click waveform to seek preview playhead
+let editorClickPct = null;
 editorWaveformWrap.addEventListener("click", (e) => {
   if (e.target.closest(".editor-handle")) return;
   const rect = editorWaveformWrap.getBoundingClientRect();
   let pct = (e.clientX - rect.left) / rect.width;
   pct = Math.max(trimStart, Math.min(trimEnd, pct));
+  editorClickPct = pct;
 
   // Show a static playhead marker
   editorPlayhead.style.display = "block";
@@ -886,8 +915,37 @@ resetBtn.addEventListener("click", () => {
   handleRight.style.right = "0";
   editorPlayhead.style.display = "none";
   branchInput.value = "";
+  editorClickPct = null;
   updateEditorUI();
   drawEditorWaveform();
+});
+
+// Stamp editor selection to comment timestamp
+stampBtn.addEventListener("click", () => {
+  if (!editorBuffer) return;
+  const dur = editorBuffer.duration;
+
+  // If trim handles are moved from defaults → stamp as region
+  const hasTrim = trimStart > 0.001 || trimEnd < 0.999;
+  // If user clicked a point inside the waveform → stamp that point
+  const hasPoint = editorClickPct !== null;
+
+  if (hasTrim) {
+    commentAudioTime = trimStart * dur;
+    commentAudioEndTime = trimEnd * dur;
+    commentTimeLabel.textContent = `${formatTime(commentAudioTime)} – ${formatTime(commentAudioEndTime)}`;
+  } else if (hasPoint) {
+    commentAudioTime = editorClickPct * dur;
+    commentAudioEndTime = null;
+    commentTimeLabel.textContent = formatTime(commentAudioTime);
+  } else {
+    showToast("Click the waveform or move trim handles first.", "error");
+    return;
+  }
+
+  commentTimeBadge.classList.remove("hidden");
+  commentInput.focus();
+  showToast("Timestamp stamped to comment.", "success");
 });
 
 // Process audio: trim, fade, volume → new AudioBuffer

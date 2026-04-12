@@ -197,7 +197,15 @@
 
         <!-- Timestamped comments -->
         <div class="comments-section">
-          <h3 class="section-title">Comments</h3>
+          <div class="comments-header-row">
+            <h3 class="section-title">Comments</h3>
+            <button class="btn-comment-stamp" id="editor-stamp-btn" title="Stamp editor selection as timestamp">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" aria-hidden="true">
+                <path d="M3.505 2.365A41.369 41.369 0 0 1 9 2c1.863 0 3.697.124 5.495.365 1.247.167 2.18 1.108 2.435 2.268a4.45 4.45 0 0 0-.577-.069 43.096 43.096 0 0 0-4.853-.27 43.096 43.096 0 0 0-4.853.27c-.2.015-.394.04-.577.069.255-1.16 1.187-2.1 2.435-2.268ZM10.5 6a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0ZM2.25 8a.75.75 0 0 0 0 1.5h.75v2.25a.75.75 0 0 0 1.5 0V9.5h11v2.25a.75.75 0 0 0 1.5 0V9.5h.75a.75.75 0 0 0 0-1.5H2.25ZM10 4.5a41.826 41.826 0 0 0-4.665.26c-.756.1-1.335.694-1.335 1.49v.5h12v-.5c0-.796-.58-1.39-1.335-1.49A41.826 41.826 0 0 0 10 4.5ZM4.335 13.19A.75.75 0 0 0 3.75 14v1.5A2.25 2.25 0 0 0 6 17.75h8a2.25 2.25 0 0 0 2.25-2.25V14a.75.75 0 0 0-.585-.81L10 12l-5.665 1.19Z"/>
+              </svg>
+              Stamp
+            </button>
+          </div>
           <div class="comment-form">
             <div class="comment-time-badge hidden" id="comment-time-badge">
               <span id="comment-time-label">0:00</span>
@@ -214,7 +222,7 @@
               />
               <button class="btn-comment-submit" id="comment-submit" disabled>Post</button>
             </div>
-            <p class="comment-hint">Click the timeline bar above the player to pin a comment to a timestamp.</p>
+            <p class="comment-hint">Click the player timeline or use Stamp to pin a timestamp from the editor.</p>
           </div>
           <ul class="comments-list" id="comments-list"></ul>
           <p class="comments-empty hidden" id="comments-empty">No comments yet. Be the first!</p>
